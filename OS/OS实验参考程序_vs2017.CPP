@@ -2584,15 +2584,27 @@ int ParseCommand(char* p)	//将输入的命令行分解成命令和参数等
 		}
 	}
 	for (i = 0; comd[0][i] != '\0'; i++)
+	{
 		if (comd[0][i] == '/')		//处理cd/，dir/usr等情况
 			break;
+		if (i > 0 && comd[0][i] == '.' && comd[0][i - 1] == '.') //处理..
+			break;
+	}
 	if (comd[0][i] != '\0')			//comd[0]中存在字符'/'
 	{
 		if (k > 0)
 			for (j = k; j > 0; j--)
 				strcpy(comd[j + 1], comd[j]);	//后移
-		strcpy(comd[1], &comd[0][i]);
-		comd[0][i] = '\0';
+		if (comd[0][i] == '.')
+		{
+			strcpy(comd[1], &comd[0][i - 1]);
+			comd[0][i - 1] = '\0';
+		}
+		else
+		{
+			strcpy(comd[1], &comd[0][i]);
+			comd[0][i] = '\0';
+		}
 		k++;	//多出一个参数
 	}
 	return k;
