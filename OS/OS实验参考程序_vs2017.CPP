@@ -42,7 +42,7 @@
 // fat——显示模拟磁盘的空闲块数(FAT表中0的个数)。
 // check——检查核对FAT表对应的空闲块数。
 // exit——结束本程序的运行。
-//
+// fc <文件名1> <文件名2>——两个文件的比较
 ////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>	//cout,cin
@@ -169,7 +169,7 @@ int buffer_to_file(FCB* fcbp, char* Buffer);	//Buffer写入文件
 int file_to_buffer(FCB* fcbp, char* Buffer);	//文件内容读到Buffer,返回文件长度
 int ParseCommand(char*);		//将输入的命令行分解成命令和参数等
 void ExecComd(int);				//执行命令
-
+void FcComd(int);
 //#define INIT	//决定初始化还是从磁盘读入
 
 int main()
@@ -400,7 +400,7 @@ void ExecComd(int k)		//执行命令
 	char CmdTab[][COMMAND_LEN] = { "create","open","write","read","close",
 		"del","dir","cd","md","rd","ren","copy","type","help","attrib",
 		"uof","closeall","block","rewind","fseek","fat","check","exit",
-		"undel","Prompt","udtab" };
+		"undel","Prompt","udtab","fc" };
 	int M = sizeof(CmdTab) / COMMAND_LEN;	//统计命令个数
 	for (cid = 0; cid < M; cid++)			//在命令表中检索命令
 		if (_stricmp(CmdTab[cid], comd[0]) == 0)//命令不区分大小写
@@ -459,6 +459,8 @@ void ExecComd(int k)		//执行命令
 	case 24:PromptComd();		//prompt命令，提示符中路径名显示与否的切换
 		break;
 	case 25:UdTabComd();		//udtab命令，显示被删除文件表(调试程序用)
+		break;
+	case 26:FcComd(k);
 		break;
 	default:cout << "\n命令错:" << comd[0] << endl;
 	}
@@ -2610,4 +2612,94 @@ int ParseCommand(char* p)	//将输入的命令行分解成命令和参数等
 	return k;
 }
 
+/////////////////////////////////////////////////////////////////
+
+void FcComd(int k)
+{
+	if (k != 2)
+	{
+		cout << "\nfc命令应提供两个文件名。\n";
+		return;
+	}
+	short i1, i2, s1, s2, size1, size2, jj = 0;
+	char attrib = '\0', * FileName1, * FileName2;
+	char* Buffer1, * Buffer2;
+	char gFileName1[PATH_LEN],gFileName2[PATH_LEN];	//存放文件全路径名
+	FCB* fcbp1, * fcbp2;
+	//处理文件1
+	s1 = ProcessPath(comd[1], FileName1, k, 0, '\020');//取FileName所在目录的首块号
+	if (s1 < 1)			//路径错误
+		return;		//失败，返回
+	s1 = FindFCB(FileName1, s1, attrib, fcbp1);		//取FileName的首块号(查其存在性)
+	strcpy(gFileName1, temppath);
+	i1 = strlen(temppath);
+	if (temppath[i1 - 1] != '/')
+		strcat(gFileName1, "/");
+	strcat(gFileName1, FileName1);	//构造文件的全路径名
+	if (s1 < 0)
+	{
+		cout << "\n文件" << gFileName1 << "不存在。\n";
+		return;
+	}
+	if (s1 == 0)
+		cout << "\n文件" << gFileName1 << "是空文件\n";
+	//处理文件2
+	s2 = ProcessPath(comd[2], FileName2, k, 0, '\020');//取FileName所在目录的首块号
+	if (s2 < 1)			//路径错误
+		return;		//失败，返回
+	s2 = FindFCB(FileName2, s2, attrib, fcbp2);		//取FileName的首块号(查其存在性)
+	strcpy(gFileName2, temppath);
+	i2 = strlen(temppath);
+	if (temppath[i2 - 1] != '/')
+		strcat(gFileName2, "/");
+	strcat(gFileName2, FileName2);	//构造文件的全路径名
+	if (s2 < 0)
+	{
+		cout << "\n文件" << gFileName2 << "不存在。\n";
+		return;
+	}
+	if (s2 == 0)
+		cout << "\n文件" << gFileName2 << "是空文件。\n";
+	if (!strcmp(gFileName1, gFileName2))
+	{
+		cout << "\n文件" << gFileName1 << "自己与自己比较。\n";
+		return;
+	}
+	size1 = fcbp1->Fsize, size2 = fcbp2->Fsize;
+	if (size1 != size2)
+	{
+		cout << "文件" << gFileName1 << "与文件" << gFileName2 << "的长度不同。\n";
+		cout << "文件" << gFileName1 << "的长度为：" << size1 << endl;
+		cout << "文件" << gFileName2 << "的长度为：" << size2 << endl;
+	}
+	Buffer1 = new char[size1 + 1];		//分配动态内存空间
+	Buffer2 = new char[size2 + 1];
+	file_to_buffer(fcbp1, Buffer1);
+	file_to_buffer(fcbp2, Buffer2);
+	bool flag = true;
+	int pos = 0;
+	while (size1 && size2)
+	{
+		if (Buffer1[pos] == Buffer2[pos])
+		{
+			pos++;
+			size1--, size2--;
+		}
+		else
+		{
+			flag = false;
+			cout << "文件" << gFileName1 << "与文件" << gFileName2 << "在第" << pos + 1 << "字节处不同：" << Buffer1[pos] << "," << Buffer2[pos] << endl;
+			//cout << (int)Buffer1[pos] << "," << (int)Buffer2[pos] << endl;
+			break;
+		}
+	}
+	if (flag && (size1 || size2))
+	{
+		flag = false;
+		cout << "文件" << gFileName1 << "与文件" << gFileName2 << "在第" << pos + 1 << "字节处不同：" << Buffer1[pos] << "," << Buffer2[pos] << endl;
+	}
+	delete[] Buffer1,Buffer2;		//释放分配的动态内存空间
+	if (flag) cout << "\n文件" << gFileName1 << "与" << gFileName2 << "内容相同\n";
+	return;
+}
 /////////////////////////////////////////////////////////////////
