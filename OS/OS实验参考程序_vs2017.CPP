@@ -44,6 +44,7 @@
 // exit——结束本程序的运行。
 // fc <文件名1> <文件名2>——两个文件的比较
 // replace <文件名> <目录名>——文件取代
+// batch——批处理
 ////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>	//cout,cin
@@ -172,6 +173,7 @@ int ParseCommand(char*);		//将输入的命令行分解成命令和参数等
 void ExecComd(int);				//执行命令
 void FcComd(int);
 void ReplaceComd(int);
+void BatchComd(int);
 //#define INIT	//决定初始化还是从磁盘读入
 
 int main()
@@ -402,7 +404,7 @@ void ExecComd(int k)		//执行命令
 	char CmdTab[][COMMAND_LEN] = { "create","open","write","read","close",
 		"del","dir","cd","md","rd","ren","copy","type","help","attrib",
 		"uof","closeall","block","rewind","fseek","fat","check","exit",
-		"undel","Prompt","udtab","fc","replace" };
+		"undel","Prompt","udtab","fc","replace","batch" };
 	int M = sizeof(CmdTab) / COMMAND_LEN;	//统计命令个数
 	for (cid = 0; cid < M; cid++)			//在命令表中检索命令
 		if (_stricmp(CmdTab[cid], comd[0]) == 0)//命令不区分大小写
@@ -465,6 +467,8 @@ void ExecComd(int k)		//执行命令
 	case 26:FcComd(k);
 		break;
 	case 27:ReplaceComd(k);
+		break;
+	case 28:BatchComd(k);
 		break;
 	default:cout << "\n命令错:" << comd[0] << endl;
 	}
@@ -2798,4 +2802,100 @@ void ReplaceComd(int k)
 	buffer_to_file(fcbp2, Buffer);
 	delete[]Buffer;
 	return;
+}
+/////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+void BatchComd(int k)
+{
+	char cmd[INPUT_LEN];			//命令行缓冲区
+	if (k == 1)//从磁盘文件读入
+	{
+		ifstream fin(comd[1], ios::in);
+		if (!fin.is_open())
+		{
+			cout << "\n文件" << comd[1] << "打开失败。\n";
+			return;
+		}
+		while (!fin.eof())	//循环，直到文件结束
+		{			//输入命令，分析并执行命令
+			cout << "\nC:";					//显示提示符(本系统总假定是C盘)
+			if (dspath)
+				cout << curpath.cpath;
+			cout << ">";
+			fin.getline(cmd, INPUT_LEN);		//输入命令
+			cout << cmd << endl;
+			if (strlen(cmd))
+			{
+				k = ParseCommand(cmd);		//分解命令及其参数
+							//comd[0]中是命令，comd[1],comd[2]...是参数		
+				ExecComd(k);				//执行命令
+			}
+		}
+		fin.close();
+	}
+	else if (k == 2)//从模拟盘中读入
+	{
+		if (!strcmp(comd[2], "s"))
+		{
+			short i, s, size;
+			char attrib = '\0', * FileName;
+			char* Buffer;
+			char gFileName[PATH_LEN];	//存放文件全路径名
+			FCB* fcbp;
+			s = ProcessPath(comd[1], FileName, k, 0, '\020');//取FileName所在目录的首块号
+			if (s < 1)			//路径错误
+				return;		//失败，返回
+			s = FindFCB(FileName, s, attrib, fcbp);		//取FileName的首块号(查其存在性)
+			strcpy(gFileName, temppath);
+			i = strlen(temppath);
+			if (temppath[i - 1] != '/')
+				strcat(gFileName, "/");
+			strcat(gFileName, FileName);	//构造文件的全路径名
+			if (s < 0)
+			{
+				cout << "\n文件" << gFileName << "不存在。\n";
+				return;
+			}
+			if (s == 0)
+				cout << "\n文件" << gFileName << "是空文件\n";
+			size = fcbp->Fsize;
+			Buffer = new char[size + 1];		//分配动态内存空间
+			file_to_buffer(fcbp, Buffer);
+			int j1 = 0, j2 = 0;
+			while (j1<size+1)	//循环，直到Buffer结束
+			{			//输入命令，分析并执行命令
+				cout << "\nC:";					//显示提示符(本系统总假定是C盘)
+				if (dspath)
+					cout << curpath.cpath;
+				cout << ">";
+				j2 = 0;
+				while(j1<size+1)
+				{
+					if (Buffer[j1++] == '\n') break;
+					else cmd[j2++] = Buffer[j1-1];
+				}
+				cmd[j2] = '\0';
+				cout << cmd << endl;
+				//cout << strlen(cmd) << endl;
+				if (strlen(cmd))
+				{
+					k = ParseCommand(cmd);		//分解命令及其参数
+								//comd[0]中是命令，comd[1],comd[2]...是参数		
+					ExecComd(k);				//执行命令
+				}
+			}
+			delete[] Buffer;		//释放分配的动态内存空间
+		}
+		else
+		{
+			cout << "\nbatch命令参数错误。\n";
+			return;
+		}
+	}
+	else//参数错误
+	{
+		cout << "\nbatch命令参数数量错误。\n";
+		return;
+	}
 }
