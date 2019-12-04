@@ -101,6 +101,10 @@ struct UnDel		//恢复被删除文件表的数据结构
 								//首块号也存于fb所指的盘块中
 };
 
+struct CurFile		//定义当前操作文件的数据结构
+{
+	char cpath[PATH_LEN];		//当前操作文件绝对路径字符串(全路径名)
+};
 //关于恢复被删除文件问题，还可以采用类似于Windows的回收站的方法。例如可以在根目录中
 //建立一个特殊的文件夹recycled (其属性为：只读、隐藏、系统)，其FCB记录结构中的成员
 //Fsize，不用来存储文件长度，而用来存储一个盘块号，该盘块中存储文件长度和文件的全路
@@ -129,6 +133,7 @@ short ffbp = 1;
 //	short Udelp;	//udtab表的第一个空表项的下标
 
 int dspath = 1;		//dspath=1,提示符中显示当前目录
+CurFile curFile;				//当前操作文件
 
 //函数原型说明
 int CreateComd(int);			//create命令处理函数
@@ -174,6 +179,7 @@ void ExecComd(int);				//执行命令
 void FcComd(int);
 void ReplaceComd(int);
 void BatchComd(int);
+void ChangeCurFile(char*);
 //#define INIT	//决定初始化还是从磁盘读入
 
 int main()
@@ -930,8 +936,8 @@ int TypeComd(int k)		//type命令处理函数(显示文件内容)
 
 	if (k < 1)
 	{
-		cout << "\n命令中无文件名。\n";
-		return -1;
+		cout << "\n命令中无文件名。将使用当前操作文件。\n";
+		strcpy(comd[1], curFile.cpath);
 	}
 	s = ProcessPath(comd[1], FileName, k, 0, '\020');//取FileName所在目录的首块号
 	if (s < 1)			//路径错误
@@ -1137,6 +1143,7 @@ int CreateComd(int k)		//create命令处理函数：建立新文件
 	fcbp1->Fsize = 0;						//空文件长度为0
 	Put_UOF(gFileName, i_uof, 1, fcbp1);	//建立UOF登记项
 	cout << "\n文件" << gFileName << "建立成功\n";
+	ChangeCurFile(gFileName);
 	return 1;							//文件创建成功，返回
 }
 
@@ -1199,6 +1206,7 @@ int OpenComd(int k)			//open命令处理函数：打开文件
 	}
 	Put_UOF(gFileName, i, 2, fcbp);
 	cout << "\n文件" << gFileName << "打开成功。\n";
+	ChangeCurFile(gFileName);
 	return 1;
 }
 
@@ -1365,6 +1373,7 @@ int WriteComd(int k)		//write命令的处理函数
 	uof[ii_uof].fsize = uof[ii_uof].fp->Fsize;
 	uof[ii_uof].writep = uof[ii_uof].fsize + 1;
 	cout << "\n写文件" << uof[ii_uof].fname << "成功.\n";
+	ChangeCurFile(temppath);
 	return 1;
 }
 
@@ -1380,8 +1389,8 @@ int CloseComd(int k)				//close命令的处理函数：关闭文件
 	FCB* p;
 	if (k < 1)
 	{
-		cout << "\n命令中缺少文件名。\n";
-		return -1;
+		cout << "\n命令中缺少文件名。将使用当前操作文件。\n";
+		strcpy(comd[1], curFile.cpath);
 	}
 	FindPath(comd[1], attrib, 0, p);	//构成全路径且去掉“..”存于temppath中
 	i_uof = Check_UOF(temppath);		//查UOF
@@ -1806,6 +1815,7 @@ int ReadComd(int k)		//read命令的处理函数：读文件
 	}
 	cout << endl;
 	uof[i_uof].readp = pos + readc;	//调整读指针
+	ChangeCurFile(temppath);
 	return 1;
 }
 
@@ -1949,10 +1959,16 @@ int FseekComd(int k)	//fseek命令的处理函数
 	char attrib = '\0';
 	FCB* fcbp;
 
-	if (k != 2)
+	if (k != 2&&k != 1)
 	{
-		cout << "\n命令参数个数错误。本命令必须有2个参数。\n";
+		cout << "\n命令参数个数错误。本命令必须有2个或1个参数。\n";
 		return -1;
+	}
+	if (k == 1)
+	{
+		cout << "\n未提供文件名。将使用当前操作文件。\n";
+		strcpy(comd[2], comd[1]);
+		strcpy(comd[1], curFile.cpath);
 	}
 	n = atoi(comd[2]);
 	FindPath(comd[1], attrib, 0, fcbp);		//构成全路径且去掉“..”存于temppath中
@@ -1974,6 +1990,7 @@ int FseekComd(int k)	//fseek命令的处理函数
 	}
 	uof[i_uof].readp = n;				//读指针设定为n
 	uof[i_uof].writep = n;			//写指针设定为n
+	ChangeCurFile(temppath);
 	return 1;						//修改成功，返回
 }
 
@@ -2137,6 +2154,7 @@ int RewindComd(int k)	//rewind命令的处理函数：读、写指针移到文�
 	else
 		uof[i_uof].readp = 0;			//非空文件的读指针设定为1
 	uof[i_uof].writep = 1;			//文件的写指针设定为1
+	ChangeCurFile(temppath);
 	return 1;						// 修改成功，返回
 }
 
@@ -2898,5 +2916,13 @@ void BatchComd(int k)
 		cout << "\nbatch命令参数数量错误。\n";
 		return;
 	}
+}
+/////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+void ChangeCurFile(char* path)
+{
+	strcpy(curFile.cpath, path);
+	//cout << "cur file->" << curFile.cpath << endl;
 }
 /////////////////////////////////////////////////////////////////
