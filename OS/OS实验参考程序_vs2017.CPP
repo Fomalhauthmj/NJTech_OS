@@ -43,6 +43,7 @@
 // check——检查核对FAT表对应的空闲块数。
 // exit——结束本程序的运行。
 // fc <文件名1> <文件名2>——两个文件的比较
+// replace <文件名> <目录名>——文件取代
 ////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>	//cout,cin
@@ -170,6 +171,7 @@ int file_to_buffer(FCB* fcbp, char* Buffer);	//文件内容读到Buffer,返回�
 int ParseCommand(char*);		//将输入的命令行分解成命令和参数等
 void ExecComd(int);				//执行命令
 void FcComd(int);
+void ReplaceComd(int);
 //#define INIT	//决定初始化还是从磁盘读入
 
 int main()
@@ -400,7 +402,7 @@ void ExecComd(int k)		//执行命令
 	char CmdTab[][COMMAND_LEN] = { "create","open","write","read","close",
 		"del","dir","cd","md","rd","ren","copy","type","help","attrib",
 		"uof","closeall","block","rewind","fseek","fat","check","exit",
-		"undel","Prompt","udtab","fc" };
+		"undel","Prompt","udtab","fc","replace" };
 	int M = sizeof(CmdTab) / COMMAND_LEN;	//统计命令个数
 	for (cid = 0; cid < M; cid++)			//在命令表中检索命令
 		if (_stricmp(CmdTab[cid], comd[0]) == 0)//命令不区分大小写
@@ -461,6 +463,8 @@ void ExecComd(int k)		//执行命令
 	case 25:UdTabComd();		//udtab命令，显示被删除文件表(调试程序用)
 		break;
 	case 26:FcComd(k);
+		break;
+	case 27:ReplaceComd(k);
 		break;
 	default:cout << "\n命令错:" << comd[0] << endl;
 	}
@@ -2699,7 +2703,99 @@ void FcComd(int k)
 		cout << "文件" << gFileName1 << "与文件" << gFileName2 << "在第" << pos + 1 << "字节处不同：" << Buffer1[pos] << "," << Buffer2[pos] << endl;
 	}
 	delete[] Buffer1,Buffer2;		//释放分配的动态内存空间
-	if (flag) cout << "\n文件" << gFileName1 << "与" << gFileName2 << "内容相同\n";
+	if (flag) cout << "\n文件" << gFileName1 << "与" << gFileName2 << "内容相同。\n";
 	return;
 }
 /////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+void ReplaceComd(int k)
+{
+	if (k == 0)
+	{
+		//无参数
+		cout << "\nreplace命令未提供参数。\n";
+		return;
+	}
+	else if (k == 1)
+	{
+		//目录名参数缺省
+		strcpy(comd[2], curpath.cpath);
+	}
+	else if (k > 2)
+	{
+		cout << "\nreplace命令参数最多为2个。\n";
+		//多余参数
+	}
+	short i1, i2, s1, s2;
+	char attrib = '\0', * FileName1;
+	char gFileName1[PATH_LEN], gFileName2[PATH_LEN];	//存放文件全路径名
+	FCB* fcbp1, * fcbp2;
+	//处理文件1
+	s1 = ProcessPath(comd[1], FileName1, k, 0, '\020');//取FileName所在目录的首块号
+	if (s1 < 1)			//路径错误
+		return;		//失败，返回
+	s1 = FindFCB(FileName1, s1, attrib, fcbp1);		//取FileName的首块号(查其存在性)
+	strcpy(gFileName1, temppath);
+	i1 = strlen(temppath);
+	if (temppath[i1 - 1] != '/')
+		strcat(gFileName1, "/");
+	strcat(gFileName1, FileName1);	//构造文件的全路径名
+	if (s1 < 0)
+	{
+		cout << "\n文件" << gFileName1 << "不存在。\n";
+		return;
+	}
+	//处理文件2
+	i2 = strlen(comd[2]);
+	if (comd[2][i2 - 1] != '/')
+		strcat(comd[2], "/");
+	strcat(comd[2], FileName1);	//构造文件路径
+	s2 = ProcessPath(comd[2], FileName1, k, 0, '\020');
+	if (s2 < 1)
+		return;
+	s2 = FindFCB(FileName1, s2, attrib, fcbp2);
+	strcpy(gFileName2, temppath);
+	i2 = strlen(temppath);
+	if (temppath[i2 - 1] != '/')
+		strcat(gFileName2, "/");
+	strcat(gFileName2, FileName1);	//构造文件的全路径名
+	if (s2 < 0)
+	{
+		cout << "\n文件" << gFileName2 << "不存在。\n";
+		return;
+	}
+	//cout << gFileName1 << endl;
+	//cout << gFileName2 << endl;
+	//若指定文件或被取代文件不存在，则报错 ✅
+	//若被取代的是只读属性的文件时，应询问用户✅
+	if ((int)fcbp2->Fattrib & 1)
+	{
+		cout << "\n文件" << gFileName2 << "是只读属性的文件。是否继续操作？（y/n）\n";
+		char choice;
+		cin >> choice;
+		if (choice == 'N' || choice == 'n')
+			return;
+	}
+	//具有隐藏和系统属性的文件不能被取代✅
+	if ((int)fcbp2->Fattrib & 6)
+	{
+		cout << "\n文件" << gFileName2 << "具有隐藏和系统属性的文件不能被取代。\n";
+		return;
+	}
+	//若目录名参数缺省，则取代当前目录的同名文件✅
+	//文件名指定的文件和被取代的文件不应该是同一个文件，即不能自己取代自己✅
+	if (!strcmp(gFileName1, gFileName2))
+	{
+		cout << "\n文件" << gFileName1 << "不能自己取代自己。\n";
+		return;
+	}
+	//取代文件
+	char* Buffer;
+	int size1 = fcbp1->Fsize;
+	Buffer = new char[size1 + 1];
+	file_to_buffer(fcbp1, Buffer);
+	buffer_to_file(fcbp2, Buffer);
+	delete[]Buffer;
+	return;
+}
