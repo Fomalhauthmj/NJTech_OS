@@ -1519,7 +1519,51 @@ int DelComd(int k)			//del(删除文件)命令处理函数
 	// 的信息，当指定文件不存在时给出错误信息。
 	// 删除文件时，将该文件的有关信息记录到删除文件恢复信息表udtab中，
 	// 以备将来恢复时使用。
-
+	if (k < 1)
+	{
+		cout << "\n命令中没有指定文件名。\n";
+		return -1;
+	}
+	if (!strcmp(comd[1], "*"))
+	{
+		//统配符
+		char* cur_path = new char[PATH_LEN], * FileName;
+		strcpy(cur_path, curpath.cpath);
+		int path_len = strlen(cur_path);
+		if (cur_path[path_len - 1] != '/')
+			strcat(cur_path, "/");
+		strcat(cur_path, "*");
+		//cout << cur_path << endl;
+		int s = ProcessPath(cur_path, FileName, k, 0, '\020');//取FileName所在目录的首块号
+		//cout << FileName << endl;
+		//cout << s << endl;
+		if (s == 1) strcpy(cur_path, "/");//根目录特殊处理
+		//cout << cur_path << endl;
+		short i, s0;
+		//cout << "start" << endl;
+		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
+		{
+			FCB* fcbp1 = (FCB*)Disk[s];
+			for (i = 0; i < 4; i++, fcbp1++)
+				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0'&&(int)fcbp1->Fattrib<16)
+				{
+					char* FilePath = new char[PATH_LEN];
+					strcpy(FilePath, cur_path);
+					int len = strlen(FilePath);
+					if (FilePath[len - 1] != '/')
+						strcat(FilePath, "/");
+					strcat(FilePath, fcbp1->FileName);
+					strcpy(comd[1], FilePath);
+					//cout << comd[1] << endl;
+					DelComd(k);//找到非空目录项
+					delete[] FilePath;
+				}
+			s0 = s;		//记下上一个盘块号
+			s = FAT[s];	//取下一个盘块号
+		}
+		delete[] cur_path;
+		return 1;
+	}
 	short i, s0, s;
 	char yn, attr;
 	char attrib = '\0', * FileName;
@@ -1854,6 +1898,57 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		cout << "\n命令中参数太多或太少。\n";
 		return -1;
 	}
+	if (!strcmp(comd[1], "*"))
+	{
+		//统配符
+		char* cur_path = new char[PATH_LEN], * FileName;
+		strcpy(cur_path, curpath.cpath);
+		int path_len = strlen(cur_path);
+		if (cur_path[path_len - 1] != '/')
+			strcat(cur_path, "/");
+		strcat(cur_path, "*");
+		//cout << cur_path << endl;
+		int s = ProcessPath(cur_path, FileName, k, 0, '\020');//取FileName所在目录的首块号
+		//cout << FileName << endl;
+		//cout << s << endl;
+		if (s == 1) strcpy(cur_path, "/");//根目录特殊处理
+		//cout << cur_path << endl;
+		short i, s0;
+		//cout << "start" << endl;
+		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
+		{
+			FCB* fcbp1 = (FCB*)Disk[s];
+			char* target_path = new char[PATH_LEN], * base_path=new char[PATH_LEN];
+			int temp_len = strlen(comd[2]);
+			if (comd[2][temp_len - 1] != '/')
+				strcat(comd[2], "/");
+			strcpy(target_path, comd[2]);
+			strcpy(base_path, comd[2]);
+			for (i = 0; i < 4; i++, fcbp1++)
+				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
+				{
+					char* FilePath = new char[PATH_LEN];
+					strcpy(FilePath, cur_path);
+					int len = strlen(FilePath);
+					if (FilePath[len - 1] != '/')
+						strcat(FilePath, "/");
+					strcat(FilePath, fcbp1->FileName);
+					strcpy(comd[1], FilePath);
+					strcat(target_path, fcbp1->FileName);//处理目标路径
+					strcpy(comd[2], target_path);
+					//cout << comd[1] << endl;
+					//cout << comd[1] << "->" << comd[2] << endl;
+					CopyComd(k);//找到非空目录项
+					strcpy(target_path, base_path);
+					delete[] FilePath;
+				}
+			s0 = s;		//记下上一个盘块号
+			s = FAT[s];	//取下一个盘块号
+			delete[] target_path, base_path;
+		}
+		delete[] cur_path;
+		return 1;
+	}
 	s01 = ProcessPath(comd[1], FileName1, k, 0, '\20');//取FileName所在目录的首块号
 	if (s01 < 1)			//路径错误
 		return s01;		//失败，返回
@@ -2070,6 +2165,46 @@ int AttribComd(int k)	//attrib命令的处理函数：修改文件或目录属�
 	{
 		cout << "\n命令中没有指定文件名。\n";
 		return -1;
+	}
+	if (!strcmp(comd[1], "*"))
+	{
+		//统配符
+		char* cur_path = new char[PATH_LEN], * FileName;
+		strcpy(cur_path, curpath.cpath);
+		int path_len = strlen(cur_path);
+		if (cur_path[path_len - 1] != '/')
+			strcat(cur_path, "/");
+		strcat(cur_path, "*");
+		//cout << cur_path << endl;
+		int s = ProcessPath(cur_path, FileName, k, 0, '\020');//取FileName所在目录的首块号
+		//cout << FileName << endl;
+		//cout << s << endl;
+		if (s == 1) strcpy(cur_path, "/");//根目录特殊处理
+		//cout << cur_path << endl;
+		short i, s0;
+		//cout << "start" << endl;
+		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
+		{
+			FCB *fcbp1 = (FCB*)Disk[s];
+			for (i = 0; i < 4; i++, fcbp1++)
+				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0')
+				{
+					char* FilePath = new char[PATH_LEN];
+					strcpy(FilePath, cur_path);
+					int len = strlen(FilePath);
+					if (FilePath[len - 1] != '/')
+						strcat(FilePath, "/");
+					strcat(FilePath,fcbp1->FileName);
+					strcpy(comd[1],FilePath);
+					//cout << comd[1] << endl;
+					AttribComd(k);//找到非空目录项
+					delete[] FilePath;
+				}
+			s0 = s;		//记下上一个盘块号
+			s = FAT[s];	//取下一个盘块号
+		}
+		delete[] cur_path;
+		return 1;
 	}
 	s = FindPath(comd[1], attrib, 1, fcbp);	//寻找指定的文件或目录并返回其首块号
 	if (s < 0)
