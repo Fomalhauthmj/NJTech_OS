@@ -1982,20 +1982,21 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 	{
 		if (!strcmp(comd[2], "..")) // cd boy .. 的情况
 		{
-			int len = strlen(curpath.cpath);
-			if (len == 1)
+			if (curpath.fblock == 1)
 			{
 				cout << "\n当前目录为根目录，根目录没有父目录。\n";
 				return -1;
 			}
 
-			char* temppath = new char[PATH_LEN];
-			strcpy(temppath, curpath.cpath);
+			int len = strlen(curpath.cpath);
+			char* nextpath = new char[PATH_LEN];
+			strcpy(nextpath, curpath.cpath);
 
 			int i;
 			for (i = len - 1;i >= 0;--i) {
-				if (temppath[i] == '/')
+				if (nextpath[i] == '/')
 					break;
+				nextpath[i] = '\0';
 			}
 			if (i == 0)
 			{
@@ -2004,8 +2005,8 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 			}
 			else
 			{
-				s02 = ProcessPath(temppath, FileName2, k, 0, '\20');
-				s02 = ProcessPath(temppath, FileName2, k, 0, '\20');
+				nextpath[i] = '\0';
+				s02 = ProcessPath(nextpath, FileName2, k, 0, '\20');
 			}
 		}
 		else if (!strcmp(comd[2], "/")) // cd boy / 的情况
