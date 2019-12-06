@@ -125,7 +125,7 @@ char comd[CK][PATH_LEN];		//分析命令时使用
 char temppath[PATH_LEN];		//临时路径(全路径)
 CurPath curpath;
 UnDel udtab[DM];				//定义删除文件恢复表，退出系统时该表可存于文件UdTab.dat中
-short Udelp = 0;					//udtab表的第一个空表项的下标，系统初始化时它为0。
+short Udelp = 0;				//udtab表的第一个空表项的下标，系统初始化时它为0。
 								//当Udelp=DM时，表示表已满，需清除最早的表项(后续表项依次前移)
 short ffbp = 1;
 //0号盘快中存储如下内容：
@@ -349,7 +349,7 @@ int main()
 	}
 	for (i = 0; i < K; i++)		//从文件Disk.dat读入盘块内容
 		if (ffi)
-			ffi.read((char*)&Disk[i], SIZE);
+			ffi.read((char*)& Disk[i], SIZE);
 		else
 			break;
 	ffi.close();
@@ -364,7 +364,7 @@ int main()
 	}
 	for (i = 0; i < DM; i++)		//从文件Disk.dat读入盘块内容
 		if (ffi)
-			ffi.read((char*)&udtab[i], sizeof(udtab[0]));
+			ffi.read((char*)& udtab[i], sizeof(udtab[0]));
 		else
 			break;
 	ffi.close();
@@ -381,6 +381,9 @@ int main()
 	cout << "\n现在你可以输入各种操作命令.\n"
 		<< "Help —— 简易帮助信息.\n"
 		<< "exit —— 退出本程序.\n";
+
+
+
 	while (1)	//循环，等待用户输入命令，直到输入“exit”结束循环，程序结束
 	{			//输入命令，分析并执行命令
 
@@ -706,7 +709,7 @@ int CdComd(int k)
 
 /////////////////////////////////////////////////////////////////
 
-int M_NewDir(char* Name, FCB* p, short fs, char attrib)	//在p位置创建一新子目录
+int M_NewDir(char* Name, FCB * p, short fs, char attrib)	//在p位置创建一新子目录
 {
 	//成功返回新子目录的首块号
 
@@ -1014,7 +1017,7 @@ int blockf(int k)	//block命令处理函数(显示文件或目录占用的盘块
 
 /////////////////////////////////////////////////////////////////
 
-void Put_UOF(char* gFileName, int i, short status, FCB* fcbp)
+void Put_UOF(char* gFileName, int i, short status, FCB * fcbp)
 {
 	strcpy(uof[i].fname, gFileName);	//复制文件全路径名
 	uof[i].attr = fcbp->Fattrib;		//复制文件属性
@@ -1031,9 +1034,9 @@ void Put_UOF(char* gFileName, int i, short status, FCB* fcbp)
 
 /////////////////////////////////////////////////////////////////
 
-int FindBlankFCB(short s, FCB*& fcbp1)	//寻找首块号为s的目录中的空目录项
+int FindBlankFCB(short s, FCB * &fcbp1)	//寻找首块号为s的目录中的空目录项
 {
-	short i, s0;
+	short i, s0 = 0;
 	while (s > 0)			//在首块号为s的目录找空登记栏，直到目录尾部
 	{
 		fcbp1 = (FCB*)Disk[s];
@@ -1485,7 +1488,7 @@ void Del1Ud(short a)
 
 /////////////////////////////////////////////////////////////////
 
-int PutUdtab(FCB* fp)
+int PutUdtab(FCB * fp)
 {
 	//在udtab中加入一表项
 
@@ -1545,7 +1548,7 @@ int DelComd(int k)			//del(删除文件)命令处理函数
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
 			for (i = 0; i < 4; i++, fcbp1++)
-				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0'&&(int)fcbp1->Fattrib<16)
+				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
 				{
 					char* FilePath = new char[PATH_LEN];
 					strcpy(FilePath, cur_path);
@@ -1619,7 +1622,7 @@ int DelComd(int k)			//del(删除文件)命令处理函数
 
 /////////////////////////////////////////////////////////////////
 
-int Udfile(FCB* fdp, short s0, char* fn, short& cc)
+int Udfile(FCB * fdp, short s0, char* fn, short& cc)
 {
 	// 在目录中找到被删除文件(文件名首字符为'\0xe5')的目录项后调用此函数
 	// 本函数在udtab表中逐个查找，当找到与被删除文件的路径相同、名字(首字
@@ -1918,7 +1921,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
-			char* target_path = new char[PATH_LEN], * base_path=new char[PATH_LEN];
+			char* target_path = new char[PATH_LEN], * base_path = new char[PATH_LEN];
 			int temp_len = strlen(comd[2]);
 			if (comd[2][temp_len - 1] != '/')
 				strcat(comd[2], "/");
@@ -1977,9 +1980,46 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 	}
 	else	//k=2(命令中提供目标文件)的情况
 	{
-		s02 = ProcessPath(comd[2], FileName2, k, 0, '\20');//取FileName2所在目录的首块号
-		if (s02 < 1)			//目标路径错误
-			return s02;
+		if (!strcmp(comd[2], "..")) // cd boy .. 的情况
+		{
+			if (curpath.fblock == 1)
+			{
+				cout << "\n当前目录为根目录，根目录没有父目录。\n";
+				return -1;
+			}
+
+			int len = strlen(curpath.cpath);
+			char* nextpath = new char[PATH_LEN];
+			strcpy(nextpath, curpath.cpath);
+
+			int i;
+			for (i = len - 1;i >= 0;--i) {
+				if (nextpath[i] == '/')
+					break;
+				nextpath[i] = '\0';
+			}
+			if (i == 0)
+			{
+				FileName2 = FileName1;
+				s02 = 1;
+			}
+			else
+			{
+				nextpath[i] = '\0';
+				s02 = ProcessPath(nextpath, FileName2, k, 0, '\20');
+			}
+		}
+		else if (!strcmp(comd[2], "/")) // cd boy / 的情况
+		{
+			FileName2 = FileName1;
+			s02 = 1;
+		}
+		else
+		{
+			s02 = ProcessPath(comd[2], FileName2, k, 0, '\20');//取FileName2所在目录的首块号
+			if (s02 < 1)			//目标路径错误
+				return s02;
+		}
 	}
 	if (!IsName(FileName2))		//若名字不符合规则
 	{
@@ -2054,7 +2094,7 @@ int FseekComd(int k)	//fseek命令的处理函数
 	char attrib = '\0';
 	FCB* fcbp;
 
-	if (k != 2&&k != 1)
+	if (k != 2 && k != 1)
 	{
 		cout << "\n命令参数个数错误。本命令必须有2个或1个参数。\n";
 		return -1;
@@ -2185,7 +2225,7 @@ int AttribComd(int k)	//attrib命令的处理函数：修改文件或目录属�
 		//cout << "start" << endl;
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
-			FCB *fcbp1 = (FCB*)Disk[s];
+			FCB* fcbp1 = (FCB*)Disk[s];
 			for (i = 0; i < 4; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0')
 				{
@@ -2194,8 +2234,8 @@ int AttribComd(int k)	//attrib命令的处理函数：修改文件或目录属�
 					int len = strlen(FilePath);
 					if (FilePath[len - 1] != '/')
 						strcat(FilePath, "/");
-					strcat(FilePath,fcbp1->FileName);
-					strcpy(comd[1],FilePath);
+					strcat(FilePath, fcbp1->FileName);
+					strcpy(comd[1], FilePath);
 					//cout << comd[1] << endl;
 					AttribComd(k);//找到非空目录项
 					delete[] FilePath;
@@ -2374,7 +2414,7 @@ void save_Disk() //保存盘块中的文件内容
 	p[1] = Udelp;
 	ofstream ffo("Disk.dat", ios::binary);
 	for (i = 0; i < K; i++)
-		ffo.write((char*)&Disk[i], SIZE);
+		ffo.write((char*)& Disk[i], SIZE);
 	ffo.close();
 }
 
@@ -2385,13 +2425,13 @@ void save_UdTab()	//保存被删除文件信息表
 	int i;
 	ofstream ffo("UdTab.dat", ios::binary);
 	for (i = 0; i < DM; i++)
-		ffo.write((char*)&udtab[i], sizeof(udtab[0]));
+		ffo.write((char*)& udtab[i], sizeof(udtab[0]));
 	ffo.close();
 }
 
 /////////////////////////////////////////////////////////////////
 
-int FindFCB(char* Name, int s, char attrib, FCB*& fcbp)
+int FindFCB(char* Name, int s, char attrib, FCB * &fcbp)
 {
 	// 从第s块开始，查找名字为Name且符合属性attrib的目录项
 	// 给定名字Name没有找到返回负数，找到返回非负数(找目录时返回恒正)
@@ -2428,7 +2468,7 @@ int FindFCB(char* Name, int s, char attrib, FCB*& fcbp)
 
 /////////////////////////////////////////////////////////////////
 
-int FindPath(char* pp, char attrib, int ffcb, FCB*& fcbp)
+int FindPath(char* pp, char attrib, int ffcb, FCB * &fcbp)
 {
 	// 查找命令中给定的路径，确定路径的正确性，并返回路径中最后一个
 	// 名字(目录名)代表的目录的地址(首块号)；对路径进行处理（去掉路
@@ -2623,7 +2663,7 @@ void UdTabComd(void)			//udtab命令
 
 /////////////////////////////////////////////////////////////////
 
-int file_to_buffer(FCB* fcbp, char* Buffer)	//文件内容读到Buffer,返回文件长度
+int file_to_buffer(FCB * fcbp, char* Buffer)	//文件内容读到Buffer,返回文件长度
 {
 	//文件内容读到Buffer,返回文件长度
 
@@ -2647,7 +2687,7 @@ int file_to_buffer(FCB* fcbp, char* Buffer)	//文件内容读到Buffer,返回文
 
 /////////////////////////////////////////////////////////////////
 
-int buffer_to_file(FCB* fcbp, char* Buffer)	//Buffer写入文件
+int buffer_to_file(FCB * fcbp, char* Buffer)	//Buffer写入文件
 {
 	//成功写入文件，返回1；写文件失败，返回0
 
@@ -2785,7 +2825,7 @@ void FcComd(int k)
 	short i1, i2, s1, s2, size1, size2, jj = 0;
 	char attrib = '\0', * FileName1, * FileName2;
 	char* Buffer1, * Buffer2;
-	char gFileName1[PATH_LEN],gFileName2[PATH_LEN];	//存放文件全路径名
+	char gFileName1[PATH_LEN], gFileName2[PATH_LEN];	//存放文件全路径名
 	FCB* fcbp1, * fcbp2;
 	//处理文件1
 	s1 = ProcessPath(comd[1], FileName1, k, 0, '\020');//取FileName所在目录的首块号
@@ -2859,7 +2899,7 @@ void FcComd(int k)
 		flag = false;
 		cout << "文件" << gFileName1 << "与文件" << gFileName2 << "在第" << pos + 1 << "字节处不同：" << Buffer1[pos] << "," << Buffer2[pos] << endl;
 	}
-	delete[] Buffer1,Buffer2;		//释放分配的动态内存空间
+	delete[] Buffer1, Buffer2;		//释放分配的动态内存空间
 	if (flag) cout << "\n文件" << gFileName1 << "与" << gFileName2 << "内容相同。\n";
 	return;
 }
@@ -3016,17 +3056,17 @@ void BatchComd(int k)
 			Buffer = new char[size + 1];		//分配动态内存空间
 			file_to_buffer(fcbp, Buffer);
 			int j1 = 0, j2 = 0;
-			while (j1<size+1)	//循环，直到Buffer结束
+			while (j1 < size + 1)	//循环，直到Buffer结束
 			{			//输入命令，分析并执行命令
 				cout << "\nC:";					//显示提示符(本系统总假定是C盘)
 				if (dspath)
 					cout << curpath.cpath;
 				cout << ">";
 				j2 = 0;
-				while(j1<size+1)
+				while (j1 < size + 1)
 				{
 					if (Buffer[j1++] == '\n') break;
-					else cmd[j2++] = Buffer[j1-1];
+					else cmd[j2++] = Buffer[j1 - 1];
 				}
 				cmd[j2] = '\0';
 				cout << cmd << endl;
