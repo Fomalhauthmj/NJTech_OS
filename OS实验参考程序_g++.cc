@@ -64,6 +64,7 @@ using namespace std;
 #define FILENAME_LEN 11  //文件名长度
 #define PATH_LEN INPUT_LEN - COMMAND_LEN
 #define DM 40  //恢复被删除文件表的表项数
+const char D_FLAG = 1 << 4, S_FLAG = 1 << 2, H_FLAG = 1 << 1, R_FLAG = 1 << 0, C_FLAG = 0;
 
 struct FCB  //定义文件目录项FCB的结构(共16个字节)
 {
@@ -170,6 +171,7 @@ int buffer_to_file(FCB* fcbp, char* Buffer);  //Buffer写入文件
 int file_to_buffer(FCB* fcbp, char* Buffer);  //文件内容读到Buffer,返回文件长度
 int ParseCommand(char*);                      //将输入的命令行分解成命令和参数等
 void ExecComd(int);                           //执行命令
+int MoveComd(int);                            // move命令
 
 //#define INIT	//决定初始化还是从磁盘读入
 
@@ -393,7 +395,7 @@ void ExecComd(int k)  //执行命令
     char CmdTab[][COMMAND_LEN] = {"create", "open", "write", "read", "close",
                                   "del", "dir", "cd", "md", "rd", "ren", "copy", "type", "help", "attrib",
                                   "uof", "closeall", "block", "rewind", "fseek", "fat", "check", "exit",
-                                  "undel", "Prompt", "udtab"};
+                                  "undel", "Prompt", "udtab", "move"};
     int M = sizeof(CmdTab) / COMMAND_LEN;           //统计命令个数
     for (cid = 0; cid < M; cid++)                   //在命令表中检索命令
         if (strcasecmp(CmdTab[cid], comd[0]) == 0)  //命令不区分大小写
@@ -478,6 +480,9 @@ void ExecComd(int k)  //执行命令
         case 25:
             UdTabComd();  //udtab命令，显示被删除文件表(调试程序用)
             break;
+        case 26:
+            MoveComd(k);  // move命令
+            break;
         default: cout << "\n命令错:" << comd[0] << endl;
     }
 }
@@ -511,6 +516,7 @@ void HelpComd()  //help命令，帮助信息(显示各命令格式)
     cout << "prompt                                  ——提示符是否显示当前目录(切换)。\n";
     cout << "fat                                     ——显示FAT表中空闲盘块数(0的个数)。\n";
     cout << "check                                   ——核对后显示FAT表中空闲盘块数。\n";
+    cout << "move <源文件名> <目标文件名>            ——移动 <源> <目标> \n";
 }
 
 /////////////////////////////////////////////////////////////////
@@ -2487,3 +2493,67 @@ int ParseCommand(char* p)  //将输入的命令行分解成命令和参数等
 }
 
 /////////////////////////////////////////////////////////////////
+
+int MoveComd(int k) {
+    short dst_s, src_s, s0;
+    char *dst_name, *src_name, *name;
+    FCB *dst_fcbp, *src_fcbp, *tmp_fcbp;
+
+    if (k != 2) {
+        cout << "\n命令错误：参数个数不正确" << endl;
+        return -1;
+    }
+
+    src_s = ProcessPath(comd[1], src_name, 0, 0, D_FLAG);
+    if (src_s < 0) {
+        cout << "\n源目录项不存在" << endl;
+        return -2;
+    }
+    s0 = FindFCB(src_name, src_s, 32, src_fcbp);
+    if (s0 < 0) {
+        cout << "\n源目录项不存在" << endl;
+        return -2;
+    }
+
+    dst_s = FindPath(comd[2], D_FLAG, 1, dst_fcbp);
+    // 目标目录不存在
+    if (dst_s < 0) {
+        // 可能是目录更名
+        dst_s = ProcessPath(comd[2], dst_name, 0, 0, D_FLAG);
+        if ((src_fcbp->Fattrib & D_FLAG) && dst_s == src_s && FindFCB(dst_name, dst_s, 32, tmp_fcbp) < 0 && IsName(dst_name)) {
+            strcpy(src_fcbp->FileName, dst_name);
+            return 1;
+        } else {
+            cout << "\n目标目录不存在" << endl;
+            return -2;
+        }
+    }
+    s0 = FindFCB(src_name, dst_s, 32, tmp_fcbp);
+    // 目标目录中已存在同名目录项
+    if (s0 >= 0) {
+        // 存在同名项且为目录
+        if (tmp_fcbp->Fattrib & D_FLAG) {
+            cout << "\n目标目录下存在同名目录，终止转移" << endl;
+            return -3;
+        }
+        // 存在同名项但为文件
+        else {
+            cout << "\n目标目录下存在同名文件，是否覆盖?(y/n) ";
+            string tmp;
+            cin >> tmp;
+            if (tmp == "y") {
+                // 执行覆盖
+                *tmp_fcbp = *src_fcbp;
+                src_fcbp->FileName[0] = 0xe5;
+            }
+            return 0;
+        }
+    }
+    // 无同名项
+    else {
+        FindBlankFCB(dst_s, tmp_fcbp);
+        *tmp_fcbp = *src_fcbp;
+        src_fcbp->FileName[0] = 0xe5;
+        return 0;
+    }
+}
