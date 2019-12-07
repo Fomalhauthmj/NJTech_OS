@@ -45,6 +45,7 @@
 // fc <文件名1> <文件名2>——两个文件的比较
 // replace <文件名> <目录名>——文件取代
 // batch——批处理
+// move——文件“搬家”及子目录改名
 ////////////////////////////////////////////////////////////////////////////
 
 #include <iostream>	//cout,cin
@@ -64,7 +65,7 @@ using namespace std;
 #define FILENAME_LEN 11	//文件名长度
 #define PATH_LEN INPUT_LEN-COMMAND_LEN
 #define DM 40			//恢复被删除文件表的表项数
-
+const char D_FLAG = 1 << 4, S_FLAG = 1 << 2, H_FLAG = 1 << 1, R_FLAG = 1 << 0, C_FLAG = 0;
 
 struct FCB			//定义文件目录项FCB的结构(共16个字节)
 {
@@ -180,6 +181,7 @@ void FcComd(int);
 void ReplaceComd(int);
 void BatchComd(int);
 void ChangeCurFile(char*);
+int MoveComd(int);
 //#define INIT	//决定初始化还是从磁盘读入
 
 int main()
@@ -413,7 +415,7 @@ void ExecComd(int k)		//执行命令
 	char CmdTab[][COMMAND_LEN] = { "create","open","write","read","close",
 		"del","dir","cd","md","rd","ren","copy","type","help","attrib",
 		"uof","closeall","block","rewind","fseek","fat","check","exit",
-		"undel","Prompt","udtab","fc","replace","batch" };
+		"undel","Prompt","udtab","fc","replace","batch","move" };
 	int M = sizeof(CmdTab) / COMMAND_LEN;	//统计命令个数
 	for (cid = 0; cid < M; cid++)			//在命令表中检索命令
 		if (_stricmp(CmdTab[cid], comd[0]) == 0)//命令不区分大小写
@@ -478,6 +480,8 @@ void ExecComd(int k)		//执行命令
 	case 27:ReplaceComd(k);
 		break;
 	case 28:BatchComd(k);
+		break;
+	case 29:MoveComd(k);
 		break;
 	default:cout << "\n命令错:" << comd[0] << endl;
 	}
@@ -3099,5 +3103,79 @@ void ChangeCurFile(char* path)
 {
 	strcpy(curFile.cpath, path);
 	//cout << "cur file->" << curFile.cpath << endl;
+}
+/////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+int MoveComd(int k)
+{
+	short dst_s, src_s, s0;
+	char* dst_name, * src_name;
+	FCB* dst_fcbp, * src_fcbp, * tmp_fcbp;
+	if (k != 2)
+	{
+		cout << "\n命令错误：参数个数不正确" << endl;
+		return -1;
+	}
+	src_s = ProcessPath(comd[1], src_name, k, 0, D_FLAG);
+	if (src_s < 0)
+		return -2;
+	s0 = FindFCB(src_name, src_s, 32, src_fcbp);
+	if (s0 < 0)
+	{
+		cout << "\n源文件或源目录不存在" << endl;
+		return -2;
+	}
+
+	dst_s = FindPath(comd[2], D_FLAG, 1, dst_fcbp);
+	// 目标目录不存在
+	if (dst_s < 0)
+	{
+		// 可能是目录更名
+		dst_s = ProcessPath(comd[2], dst_name, k, 0, D_FLAG);
+		if ((src_fcbp->Fattrib & D_FLAG) && dst_s == src_s && FindFCB(dst_name, dst_s, 32, tmp_fcbp) < 0 && IsName(dst_name))
+		{
+			strcpy(src_fcbp->FileName, dst_name);
+			return 1;
+		}
+		else
+		{
+			cout << "\n目标目录不存在" << endl;
+			return -2;
+		}
+	}
+	s0 = FindFCB(src_name, dst_s, 32, tmp_fcbp);
+	// 目标目录中已存在同名目录项
+	if (s0 >= 0)
+	{
+		// 存在同名项且为目录
+		if (tmp_fcbp->Fattrib & D_FLAG)
+		{
+			cout << "\n目标目录下存在同名目录，终止转移" << endl;
+			return -3;
+		}
+		// 存在同名项但为文件
+		else
+		{
+			cout << "\n目标目录下存在同名文件，是否覆盖?(y/n) ";
+			char tmp;
+			cin >> tmp;
+			if (tmp == 'y' || tmp == 'Y')
+			{
+				// 执行覆盖
+				*tmp_fcbp = *src_fcbp;
+				src_fcbp->FileName[0] = (char)0xe5;
+			}
+			return 0;
+		}
+	}
+	// 无同名项
+	else
+	{
+		FindBlankFCB(dst_s, tmp_fcbp);
+		*tmp_fcbp = *src_fcbp;
+		src_fcbp->FileName[0] = (char)0xe5;
+		return 0;
+	}
 }
 /////////////////////////////////////////////////////////////////
