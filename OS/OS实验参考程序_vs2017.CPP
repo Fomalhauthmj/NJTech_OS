@@ -767,6 +767,7 @@ int ProcessPath(char* path, char*& Name, int k, int n, char attrib)
 		{
 			s = 1;
 			strcpy(temppath, "/");
+			path[i] = '\0';
 		}
 		else
 		{
@@ -2008,6 +2009,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 				nextpath[i] = '\0';
 				s02 = ProcessPath(nextpath, FileName2, k, 0, '\20');
 			}
+			delete[] nextpath;
 		}
 		else if (!strcmp(comd[2], "/")) // cd boy / 的情况
 		{
@@ -2021,36 +2023,96 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 				return s02;
 		}
 	}
+
 	if (!IsName(FileName2))		//若名字不符合规则
 	{
 		cout << "\n命令中的目标文件名错误。\n";
 		return -2;
 	}
 	s2 = FindFCB(FileName2, s02, '\040', fcbp);	//取FileName2(目标文件)的首块号(查其存在性)
-	if (s2 >= 0 && fcbp->Fattrib <= '\07')	//存在同名目标文件
-	{
-		cout << "\n存在文件与目标文件同名。\n";
-		return -3;
-	}
+
 	if (s2 < 0)		//FileName2尚不存在，在s02为首块号的目录内复制目标文件
-		s22 = s02;
-	else			//FileName2存在，但它是目录名
 	{
-		s22 = s2;
-		if (s2 != s01)		//源文件与目标文件不同目录
-		{
-			b = FindFCB(FileName1, s2, attrib, fcbp);//需查FileName2目录中有没有文件FileName1
-			if (b >= 0)
-			{
-				cout << "\n有同名文件，不能复制。\n";
-				return -4;
-			}
-			FileName2 = FileName1;	//缺省目标文件名，同名复制
-		}
-		else
+		s22 = s02;
+	}
+	else if (fcbp->Fattrib <= '\07')	//存在同名目标文件
+	{
+		if (s2 == s1) // 同目录
 		{
 			cout << "\n不能同目录同名复制。\n";
 			return -5;
+		}
+		cout << "\n存在文件与目标文件同名。\n";
+		cout << "是否覆盖？[y/n]\n";
+		string choice;
+		cin >> choice;
+		if (choice[0] == 'n')
+			return -3;
+		else
+		{
+			char* nextpath = new char[PATH_LEN];
+			strcpy(nextpath, FileName1);
+			strcpy(comd[1], comd[2]);
+			if (strcmp(comd[2], FileName2))  // 绝对路径
+			{
+				strcat(comd[1], "/");
+				strcat(comd[1], FileName2);
+			}
+			DelComd(1);		// 先删除目标文件
+			strcpy(FileName1, nextpath);
+			delete[] nextpath;
+			s22 = s02;		// 取FileName2所在目录的首块号
+		}
+	}
+	else			//FileName2存在，但它是目录名
+	{
+		if (s2 == s01)		
+		{
+			cout << "\n目标目录下已存在该文件。\n";
+			return -5;
+		}
+		else         //源文件与目标目录不同目录
+		{
+			b = FindFCB(FileName1, s2, attrib, fcbp); //需查FileName2目录中有没有文件FileName1
+			if (b >= 0)
+			{
+				if (fcbp->Fattrib <= '\07') // 目标目录中存在同名源文件
+				{
+					cout << "\n该目录下有同名文件，是否覆盖？[y/n]\n";
+					string choice;
+					cin >> choice;
+					if (choice[0] == 'n')
+						return -4;
+					else
+					{
+						char* nextpath = new char[PATH_LEN];
+						strcpy(nextpath, FileName1);
+						strcpy(comd[1], comd[2]);
+						if (strcmp(comd[2], FileName2))  // 绝对路径
+						{
+							strcat(comd[1], "/");
+							strcat(comd[1], FileName2);
+						}
+						strcat(comd[1], "/");
+						strcat(comd[1], nextpath);
+						DelComd(1);		// 先删除目标文件
+						strcpy(FileName1, nextpath);
+						strcpy(FileName2, nextpath);
+						delete[] nextpath;
+						s22 = s2;		// 取FileName2所在目录的首块号
+					}
+				}
+				else 
+				{
+					cout << "\n该目录下有同名目录。\n";
+					return -5;
+				}
+			}
+			else
+			{
+				FileName2 = FileName1;
+				s22 = s2;
+			}
 		}
 	}
 	i = FindBlankFCB(s22, fcbp2);
