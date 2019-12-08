@@ -1953,6 +1953,26 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		delete[] cur_path;
 		return 1;
 	}
+
+	int path1_len = strlen(comd[1]);
+	char path11[PATH_LEN], path12[PATH_LEN];
+	for (i = 0;i < path1_len;++i)
+	{
+		if (comd[1][i] == '+')
+		{
+			path11[i] = '\0';
+			break;
+		}
+		path11[i] = comd[1][i];
+	}
+	if (i != path1_len)
+	{
+		for (int j = 0;i < path1_len;++i, ++j)
+		{
+			path12[j];
+		}
+	}
+
 	s01 = ProcessPath(comd[1], FileName1, k, 0, '\20');//取FileName所在目录的首块号
 	if (s01 < 1)			//路径错误
 		return s01;		//失败，返回
@@ -2037,7 +2057,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 	}
 	else if (fcbp->Fattrib <= '\07')	//存在同名目标文件
 	{
-		if (s2 == s1) // 同目录
+		if (s01 == s02) // 同目录
 		{
 			cout << "\n不能同目录同名复制。\n";
 			return -5;
@@ -2046,7 +2066,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		cout << "是否覆盖？[y/n]\n";
 		string choice;
 		cin >> choice;
-		if (choice[0] == 'n')
+		if (choice[0] == 'n' || choice[0] == 'N')
 			return -3;
 		else
 		{
@@ -2073,7 +2093,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		}
 		else         //源文件与目标目录不同目录
 		{
-			b = FindFCB(FileName1, s2, attrib, fcbp); //需查FileName2目录中有没有文件FileName1
+			b = FindFCB(FileName1, s2, '\040', fcbp); //需查FileName2目录中有没有文件FileName1
 			if (b >= 0)
 			{
 				if (fcbp->Fattrib <= '\07') // 目标目录中存在同名源文件
@@ -2081,7 +2101,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 					cout << "\n该目录下有同名文件，是否覆盖？[y/n]\n";
 					string choice;
 					cin >> choice;
-					if (choice[0] == 'n')
+					if (choice[0] == 'n' || choice[0] == 'N')
 						return -4;
 					else
 					{
