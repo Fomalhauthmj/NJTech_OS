@@ -2120,10 +2120,11 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 						if (comd[1][i - 1] != '/')
 							strcat(comd[1], "/");
 						strcat(comd[1], nextpath2);
+						strcat(comd[1], "/");
 						strcat(comd[1], nextpath1);
 						DelComd(1);		// 先删除目标文件
 
-						strcpy(FileName2, nextpath2);
+						strcpy(FileName2, nextpath1);
 						delete[] nextpath1;
 						delete[] nextpath2;
 						s22 = s2;		// 取FileName2所在目录的首块号
