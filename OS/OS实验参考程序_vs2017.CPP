@@ -2070,9 +2070,9 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		}
 		cout << "\n存在文件与目标文件同名。\n";
 		cout << "是否覆盖？[y/n]\n";
-		string choice;
+		char choice;
 		cin >> choice;
-		if (choice[0] == 'n' || choice[0] == 'N')
+		if (choice == 'n' || choice == 'N')
 			return -3;
 		else
 		{
@@ -2104,9 +2104,9 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 				if (fcbp->Fattrib <= '\07') // 目标目录中存在同名源文件
 				{
 					cout << "\n该目录下有同名文件，是否覆盖？[y/n]\n";
-					string choice;
+					char choice;
 					cin >> choice;
-					if (choice[0] == 'n' || choice[0] == 'N')
+					if (choice == 'n' || choice == 'N')
 						return -4;
 					else
 					{
