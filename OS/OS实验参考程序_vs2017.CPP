@@ -58,8 +58,7 @@ using namespace std;
 //定义若干符号常量
 #define S 32			//假设最多同时打开32个文件 
 #define K 5000			//假设磁盘共有5000个盘块
-//#define SIZE 64			//假设磁盘的大小是64字节
-#define SIZE 256
+#define SIZE 64			//假设磁盘的大小是64字节
 #define CK 8			//命令分解后的段数
 #define INPUT_LEN 128	//输入缓冲区长度
 #define COMMAND_LEN 11	//命令字符串长度
@@ -94,7 +93,6 @@ struct CurPath		//定义存储当前目录的数据结构
 	char cpath[PATH_LEN];		//当前目录绝对路径字符串(全路径名)
 };
 
-
 struct UnDel		//恢复被删除文件表的数据结构
 {
 	char gpath[PATH_LEN];		//被删除文件的全路径名(不含文件名)
@@ -104,17 +102,6 @@ struct UnDel		//恢复被删除文件表的数据结构
 								//首块号也存于fb所指的盘块中
 };
 
-/*4.15 方案2
-struct UnDel		//恢复被删除文件表的数据结构(共128字节,112+11+1+2+2=128)
-{
-	char gpath[112];		//被删除文件的全路径名(不含文件名)
-	char ufname[FILENAME_LEN];	//被删除文件名
-	char ufattr;				//被删除文件属性
-	short ufaddr;				//被删除文件名的首块号
-	short fb;					//存储被删除文件块号的第一个块号(链表头指针)
-								//首块号也存于fb所指的盘块中
-};
-*/
 struct CurFile		//定义当前操作文件的数据结构
 {
 	char cpath[PATH_LEN];		//当前操作文件绝对路径字符串(全路径名)
@@ -638,7 +625,7 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 	while (s > 0)
 	{
 		p = (FCB*)Disk[s];	//p指向该目录的第一个盘块
-		for (i = 0; i < 16; i++, p++)
+		for (i = 0; i < 4; i++, p++)
 		{
 			ch = p->FileName[0];	//取文件(目录)名的第一个字符
 			if (ch == (char)0xe5)		//空目录项
@@ -893,7 +880,7 @@ int RdComd(int k)
 	while (s > 0)		//循环查找，直到目录尾部
 	{
 		p = (FCB*)Disk[s];
-		for (i = 0; i < 16; i++, p++)
+		for (i = 0; i < 4; i++, p++)
 		{
 			if (p->FileName[0] != (char)0xe5 && p->FileName[0] != '\0')//累计非空目录项
 				count++;
@@ -922,7 +909,7 @@ int RdComd(int k)
 	while (s > 0)				//整理DirName的父目录空间(回收无目录项的盘块)
 	{
 		p = (FCB*)Disk[s];
-		for (j = i = 0; i < 16; i++, p++)
+		for (j = i = 0; i < 4; i++, p++)
 			if (p->FileName[0] != (char)0xe5 && p->FileName[0] != '\0')//累计非空目录项
 				j++;
 		if (j == 0)
@@ -1057,7 +1044,7 @@ int FindBlankFCB(short s, FCB * &fcbp1)	//寻找首块号为s的目录中的空�
 	while (s > 0)			//在首块号为s的目录找空登记栏，直到目录尾部
 	{
 		fcbp1 = (FCB*)Disk[s];
-		for (i = 0; i < 16; i++, fcbp1++)
+		for (i = 0; i < 4; i++, fcbp1++)
 			if (fcbp1->FileName[0] == (char)0xe5 || fcbp1->FileName[0] == '\0')
 			{
 				fcbp1->Addr = fcbp1->Fsize = 0;		//假设为空目录项
@@ -1079,7 +1066,7 @@ int FindBlankFCB(short s, FCB * &fcbp1)	//寻找首块号为s的目录中的空�
 	}
 	FAT[s0] = s;		//构成FAT链
 	fcbp1 = (FCB*)Disk[s];
-	for (i = 0; i < 16; i++, fcbp1++)
+	for (i = 0; i < 4; i++, fcbp1++)
 		fcbp1->FileName[0] = '\0';	//置空目录标志
 	fcbp1 = (FCB*)Disk[s];
 	fcbp1->Addr = fcbp1->Fsize = 0;		//假设为空目录项
@@ -1564,7 +1551,7 @@ int DelComd(int k)			//del(删除文件)命令处理函数
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
-			for (i = 0; i < 16; i++, fcbp1++)
+			for (i = 0; i < 4; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -1768,7 +1755,7 @@ int UndelComd(int k)		//undel命令
 	while (s > 0)			//在首块号为s的目录找被删除文件的表项，直到目录尾部
 	{
 		fcbp1 = (FCB*)Disk[s];
-		for (i = 0; i < 16; i++, fcbp1++)
+		for (i = 0; i < 4; i++, fcbp1++)
 		{
 			if (fcbp1->FileName[0] == (char)0xe5)		//找到可能进行删除恢复的目录项
 			{
@@ -1944,7 +1931,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 				strcat(comd[2], "/");
 			strcpy(target_path, comd[2]);
 			strcpy(base_path, comd[2]);
-			for (i = 0; i < 16; i++, fcbp1++)
+			for (i = 0; i < 4; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -2333,7 +2320,7 @@ int AttribComd(int k)	//attrib命令的处理函数：修改文件或目录属�
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
-			for (i = 0; i < 16; i++, fcbp1++)
+			for (i = 0; i < 4; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0')
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -2549,7 +2536,7 @@ int FindFCB(char* Name, int s, char attrib, FCB * &fcbp)
 	while (s > 0)
 	{
 		fcbp = (FCB*)Disk[s];
-		for (i = 0; i < 16; i++, fcbp++)		//每个盘块4个目录项
+		for (i = 0; i < 4; i++, fcbp++)		//每个盘块4个目录项
 		{
 			ch = fcbp->FileName[0];
 			if (ch == (char)0xe5)
