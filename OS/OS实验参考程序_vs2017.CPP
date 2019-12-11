@@ -340,7 +340,7 @@ int main()
 
 	// 读入文件分配表FAT
 	char yn;
-	ifstream ffi("FAT.txt", ios::_Nocreate);//打开文件FAT.txt
+	ifstream ffi("FAT256G.txt", ios::_Nocreate);//打开文件FAT.txt
 	if (!ffi)
 	{
 		cout << "Can't open FAT.txt!\n";
@@ -355,7 +355,7 @@ int main()
 	ffi.close();
 
 	//读入磁盘块Disk[ ]信息
-	ffi.open("Disk.dat", ios::binary | ios::_Nocreate);
+	ffi.open("Disk256G.dat", ios::binary | ios::_Nocreate);
 	if (!ffi)
 	{
 		cout << "Can't open Disk.dat!\n";
