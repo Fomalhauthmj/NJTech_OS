@@ -1897,9 +1897,9 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 	// 学生还可考虑使用通配符的多文件同名复制的情况(目标文件与源文件所在目录必须不同)。
 
 	short int i, size, s01, s02, s1, s2, s22, b, b0, bnum;
-	char attrib = '\0', * FileName1, * FileName2;
-	char gFileName[PATH_LEN], gFileName2[PATH_LEN];	//存放文件全路径名
-	FCB* fcbp, * fcbp1, * fcbp2;
+	char attrib = '\0', * FileName1, * FileName2, * FileName3;
+	char gFileName1[PATH_LEN], gFileName2[PATH_LEN], gFileName3[PATH_LEN];	//存放文件全路径名
+	FCB* fcbp, * fcbp1, * fcbp2, * fcbp3;
 	if (k < 1 || k>2)
 	{
 		cout << "\n命令中参数太多或太少。\n";
@@ -1957,24 +1957,183 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		return 1;
 	}
 
-	//int path1_len = strlen(comd[1]);
-	//char path11[PATH_LEN], path12[PATH_LEN];
-	//for (i = 0;i < path1_len;++i)
-	//{
-	//	if (comd[1][i] == '+')
-	//	{
-	//		path11[i] = '\0';
-	//		break;
-	//	}
-	//	path11[i] = comd[1][i];
-	//}
-	//if (i != path1_len)
-	//{
-	//	for (int j = 0;i < path1_len;++i, ++j)
-	//	{
-	//		path12[j];
-	//	}
-	//}
+	int path1_len = strlen(comd[1]);
+	char path11[PATH_LEN], path12[PATH_LEN], path2[PATH_LEN];
+	for (i = 0;i < path1_len;++i)
+	{
+		if (comd[1][i] == '+')
+		{
+			path11[i] = '\0';
+			break;
+		}
+		path11[i] = comd[1][i];
+	}
+	if (i != path1_len)
+	{
+		int j;
+		for (++i, j = 0;i < path1_len;++i, ++j)
+			path12[j] = comd[1][i];
+		path12[j] = '\0';
+		s01 = ProcessPath(path11, FileName1, k, 0, '\20');//取FileName1所在目录的首块号
+		if (s01 < 1)			//路径错误
+			return s01;		//失败，返回
+		strcpy(gFileName1, temppath);
+		i = strlen(temppath);
+		if (temppath[i - 1] != '/')
+			strcat(gFileName1, "/");
+		strcat(gFileName1, FileName1);	//构造文件的全路径名
+		s1 = FindFCB(FileName1, s01, attrib, fcbp1);	//取FileName1(源文件)的首块号(查其存在性)
+		if (s1 < 0)
+		{
+			cout << "\n要复制的文件 " << gFileName1 << " 不存在。\n";
+			return -1;
+		}
+
+		s02 = ProcessPath(path12, FileName2, k, 0, '\20');//取FileName1所在目录的首块号
+		if (s02 < 1)			//路径错误
+			return s02;		//失败，返回
+		strcpy(gFileName2, temppath);
+		i = strlen(temppath);
+		if (temppath[i - 1] != '/')
+			strcat(gFileName2, "/");
+		strcat(gFileName2, FileName2);	//构造文件的全路径名
+		s2 = FindFCB(FileName2, s02, attrib, fcbp2);	//取FileName1(源文件)的首块号(查其存在性)
+		if (s2 < 0)
+		{
+			cout << "\n要复制的文件 " << gFileName2 << " 不存在。\n";
+			return -1;
+		}
+
+		short int s03, s3;
+		if (k == 1)
+		{
+			s03 = curpath.fblock;
+			s3 = FindFCB(FileName1, s03, '\040', fcbp3);
+			if (s3 < 0)
+			{
+				strcpy(comd[1], curpath.cpath);
+				i = strlen(comd[1]);
+				if (comd[1][i - 1] != '/')
+					strcat(comd[1], "/");
+				strcat(comd[1], FileName1);
+				CreateComd(1);
+				FindFCB(FileName1, s03, '\0', fcbp3);
+			}
+			else
+			{
+				if (fcbp3->Fattrib & 16)
+				{
+					cout << "\n" << curpath.cpath << " 下存在名为 " << FileName1 << " 的目录。\n";
+					return -1;
+				}
+				else
+				{
+					cout << "\n" << curpath.cpath << " 下有同名文件，是否覆盖？[y/n] ";
+					string choice;
+					cin >> choice;
+					if (choice[0] == 'n' || choice[0] == 'N')
+						return -3;
+				}
+			}
+		}
+		else
+		{
+			s03 = ProcessPath(comd[2], FileName3, k, 0, '\20');//取FileName3所在目录的首块号
+			if (s03 < 1)			//路径错误
+				return s03;		//失败，返回
+			strcpy(gFileName3, temppath);
+			i = strlen(gFileName3);
+			if (gFileName3[i - 1] != '/')
+				strcat(gFileName3, "/");
+			strcat(gFileName3, FileName3);	//构造文件的全路径名
+			if (strcmp(comd[2], "/") == 0)
+			{
+				s3 = 1;
+				fcbp3 = (FCB*)Disk[1];
+			}
+			else
+				s3 = FindFCB(FileName3, s03, '\040', fcbp3);	//取FileName1(源文件)的首块号(查其存在性)
+
+			if (s3 < 0)
+			{
+				strcpy(comd[1], gFileName3);
+				CreateComd(1);
+				FindFCB(FileName3, s03, '\0', fcbp3);
+			}
+			else
+			{
+				if (fcbp3->Fattrib & 16)
+				{
+					s03 = FindFCB(FileName1, s3, '\040', fcbp3);
+					if (s03 < 0)
+					{
+						i = strlen(gFileName3);
+						if (gFileName3[i - 1] != '/')
+							strcat(gFileName3, "/");
+						strcat(gFileName3, FileName1);
+						strcpy(comd[1], gFileName3);
+						CreateComd(1);
+					}
+					else
+					{
+						if (fcbp3->Fattrib & 16)
+						{
+							cout << "\n" << gFileName3 << " 下存在名为 " << FileName1 << " 的目录。\n";
+							return -1;
+						}
+						else
+						{
+							cout << "\n" << gFileName3 << " 下有同名文件，是否覆盖？[y/n] ";
+							string choice;
+							cin >> choice;
+							if (choice[0] == 'n' || choice[0] == 'N')
+								return -3;
+						}
+					}
+				}
+				else
+				{
+					cout << "\n存在同名文件，是否覆盖？[y/n] ";
+					string choice;
+					cin >> choice;
+					if (choice[0] == 'n' || choice[0] == 'N')
+						return -3;
+				}
+			}
+		}
+		short jj = 0, s, size1, size2;
+		j = 0;
+		size1 = fcbp1->Fsize;
+		size2 = fcbp2->Fsize;
+		char* Buffer = new char[size1 + size2 + 2];
+		s = fcbp1->Addr;					//取文件1首块号
+		while (s > 0)
+		{
+			for (i = 0;i < SIZE;i++, j++, jj++)
+			{
+				if (jj >= size1)				//已读完该文件
+					break;
+				Buffer[j] = Disk[s][i];
+			}
+			s = FAT[s];					//取下一个盘块
+		}
+		Buffer[j++] = '\n';
+		s = fcbp2->Addr;					//取文件1首块号
+		jj = 0;
+		while (s > 0)
+		{
+			for (i = 0;i < SIZE;i++, j++, jj++)
+			{
+				if (jj >= size2)				//已读完该文件
+					break;
+				Buffer[j] = Disk[s][i];
+			}
+			s = FAT[s];					//取下一个盘块
+		}
+		Buffer[j] = '\0';
+		buffer_to_file(fcbp3, Buffer);
+		return 1;
+	}
 
 	s01 = ProcessPath(comd[1], FileName1, k, 0, '\20');//取FileName所在目录的首块号
 	if (s01 < 1)			//路径错误
@@ -1986,15 +2145,15 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 		return -1;
 	}
 	fcbp1 = fcbp;			//记下源文件目录项指针值
-	strcpy(gFileName, temppath);
+	strcpy(gFileName1, temppath);
 	i = strlen(temppath);
 	if (temppath[i - 1] != '/')
-		strcat(gFileName, "/");
-	strcat(gFileName, FileName1);	//构造文件的全路径名
-	i = Check_UOF(gFileName);			//查UOF
+		strcat(gFileName1, "/");
+	strcat(gFileName1, FileName1);	//构造文件的全路径名
+	i = Check_UOF(gFileName1);			//查UOF
 	if (i < S)						//该文件已在UOF中
 	{
-		cout << "\n文件" << gFileName << "已经打开，不能复制!\n";
+		cout << "\n文件" << gFileName1 << "已经打开，不能复制!\n";
 		return -2;
 	}
 
@@ -2060,6 +2219,11 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 	}
 	
 	s2 = FindFCB(FileName2, s02, '\040', fcbp);	//取FileName2(目标文件)的首块号(查其存在性)
+	if (fcbp->Fattrib & 16)
+	{
+		strcat(temppath, FileName2);
+		strcpy(gFileName2, temppath);
+	}
 
 	if (s2 < 0)		//FileName2尚不存在，在s02为首块号的目录内复制目标文件
 	{
