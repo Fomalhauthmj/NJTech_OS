@@ -50,9 +50,10 @@
 
 #include <iostream>	//cout,cin
 #include <iomanip>	//setw(),setiosflags()
-#include <stdlib.h>		//exit(),atoi()
-#include <string.h>		//strcpy(),_stricmp()
+#include <stdlib.h>	//exit(),atoi()
+#include <string.h>	//strcpy(),_stricmp()
 #include <fstream>	//文件操作用
+#include <sstream>	//dir > <文件名>
 using namespace std;
 
 //定义若干符号常量
@@ -155,6 +156,7 @@ int RenComd(int);				//ren命令处理函数
 int AttribComd(int);			//attrib命令处理函数
 void UofComd(void);				//uof命令处理函数
 void HelpComd(void);			//help命令处理函数
+int ProcessPath(char*, char*&, int, int, char);
 int FindPath(char*, char, int, FCB*&);	//找指定目录(的首块号)
 int FindFCB(char*, int, char, FCB*&);		//找指定的文件或目录
 int FindBlankFCB(short s, FCB*& fcbp1);	//寻找首块号为s的目录中的空目录项
@@ -575,18 +577,23 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 	// 学生可考虑将此函数修改成命令中的路径的最后允许是文件名的情况。
 	// 另外还可以考虑含通配符的问题。
 
-	short i, s;
-	short filecount, dircount, fsizecount;	//文件数、目录数、文件长度累计
-	char ch, attrib = '\0', attr, cc;
-	FCB* fcbp, * p;
-
-	filecount = dircount = fsizecount = 0;
-	if (k > 1)	//命令中多于1个参数，错误(较复杂的处理应当允许有多个参数)
+	if (k > 4)	//命令中多于4个参数，错误
 	{
 		cout << "\n命令错误：参数太多。\n";
 		return -1;
 	}
-	if (k < 1)	//命令无参数，显示当前目录
+	short i, s = 0, typeflag = 1;
+	short filecount, dircount, fsizecount;	//文件数、目录数、文件长度累计
+	char ch, attrib = '\0', attr, cc;
+	char* FileName;
+	int s01, s1;
+	char gFileName[PATH_LEN];
+	FCB* fcbp = NULL, * p;
+	filecount = dircount = fsizecount = 0;
+	stringstream sstream;
+	string strResult;
+
+	if (k == 0)	//命令无参数，显示当前目录
 	{
 		strcpy(temppath, curpath.cpath);
 		s = curpath.fblock;	//当前目录的首块号保存于s
@@ -610,22 +617,145 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 			}
 		}
 	}
-	else		//命令有2个参数(k=2)
+	else if (k == 2)		//命令有2个参数(k=2)
 	{
+		if (strcmp(comd[1], ">") == 0 || strcmp(comd[1], ">>") == 0)
+		{
+			if (strcmp(comd[1], ">") == 0)
+				typeflag = 2;
+			else
+				typeflag = 3;
+
+			s01 = ProcessPath(comd[2], FileName, k, 0, '\20');//取FileName所在目录的首块号
+			if (s01 < 1)			//路径错误
+				return s01;		//失败，返回
+			strcpy(gFileName, temppath);
+			i = strlen(temppath);
+			if (temppath[i - 1] != '/')
+				strcat(gFileName, "/");
+			strcat(gFileName, FileName);	//构造文件的全路径名
+			s1 = FindFCB(FileName, s01, '\0', fcbp);	//取FileName(源文件)的首块号(查其存在性)
+			if (s1 < 0)
+			{
+				strcpy(comd[1], gFileName);
+				int f = CreateComd(1);
+				if (f < 0) return f;
+				FindFCB(FileName, s01, '\0', fcbp);
+			}
+
+			strcpy(temppath, curpath.cpath);
+			s = curpath.fblock;	//当前目录的首块号保存于s
+		}
+		else
+		{
+			s = FindPath(comd[1], '\020', 1, fcbp);	//找指定目录(的首块号)
+			if (s < 1)
+			{
+				cout << "\n输入的路径错误！" << endl;
+				return -1;
+			}
+			i = GetAttrib(comd[2], attrib);
+			if (i < 0) return i;
+		}
+	}
+	else if (k == 3)
+	{
+		char tmppath[PATH_LEN];	//tmppath暂存当前路径
+		if (comd[1][0] == '|')
+		{
+			i = GetAttrib(comd[1], attrib);
+			if (i < 0) return i;
+			strcpy(tmppath, curpath.cpath);
+			s = curpath.fblock; //当前目录的首块号保存于s
+		}
+		else
+		{
+			s = FindPath(comd[1], '\020', 1, fcbp);	//找指定目录(的首块号)
+			if (s < 1)
+			{
+				cout << "\n输入的路径错误！" << endl;
+				return -1;
+			}
+			strcpy(tmppath, temppath);
+		}
+
+		if (strcmp(comd[2], ">") == 0)
+			typeflag = 2;
+		else if (strcmp(comd[2], ">>") == 0)
+			typeflag = 3;
+		else
+		{
+			cout << "\n命令错误。\n";
+			return -1;
+		}
+
+		s01 = ProcessPath(comd[3], FileName, k, 0, '\20');//取FileName所在目录的首块号
+		if (s01 < 1)			//路径错误
+			return s01;		//失败，返回
+		strcpy(gFileName, temppath);
+		i = strlen(temppath);
+		if (temppath[i - 1] != '/')
+			strcat(gFileName, "/");
+		strcat(gFileName, FileName);	//构造文件的全路径名
+		s1 = FindFCB(FileName, s01, '\0', fcbp);	//取FileName(源文件)的首块号(查其存在性)
+		if (s1 < 0)
+		{
+			strcpy(comd[1], gFileName);
+			int f = CreateComd(1);
+			if (f < 0) return f;
+			FindFCB(FileName, s01, '\0', fcbp);
+		}
+		strcpy(temppath, tmppath);
+	}
+	else if (k == 4)
+	{
+		// 处理comd[1]
 		s = FindPath(comd[1], '\020', 1, fcbp);	//找指定目录(的首块号)
 		if (s < 1)
 		{
 			cout << "\n输入的路径错误！" << endl;
 			return -1;
 		}
+		char tmppath[PATH_LEN];	//tmppath暂存当前路径
+		strcpy(tmppath, temppath);
+		// 处理comd[2]
 		i = GetAttrib(comd[2], attrib);
 		if (i < 0) return i;
+		// 处理comd[3]
+		if (strcmp(comd[3], ">") == 0)
+			typeflag = 2;
+		else if (strcmp(comd[3], ">>") == 0)
+			typeflag = 3;
+		else
+		{
+			cout << "\n命令错误。\n";
+			return -1;
+		}
+		// 处理comd[4]
+		s01 = ProcessPath(comd[4], FileName, k, 0, '\20');//取FileName所在目录的首块号
+		if (s01 < 1)			//路径错误
+			return s01;		//失败，返回
+		strcpy(gFileName, temppath);
+		i = strlen(temppath);
+		if (temppath[i - 1] != '/')
+			strcat(gFileName, "/");
+		strcat(gFileName, FileName);	//构造文件的全路径名
+		s1 = FindFCB(FileName, s01, '\0', fcbp);	//取FileName(源文件)的首块号(查其存在性)
+		if (s1 < 0)
+		{
+			strcpy(comd[1], gFileName);
+			int f = CreateComd(1);
+			if (f < 0) return f;
+			FindFCB(FileName, s01, '\0', fcbp);
+		}
+		strcpy(temppath, tmppath);
 	}
-	cout << "\nThe Directory of C:" << temppath << endl << endl;
+
+	sstream << "\nThe Directory of C:" << temppath << endl << endl;
 	while (s > 0)
 	{
 		p = (FCB*)Disk[s];	//p指向该目录的第一个盘块
-		for (i = 0; i < 4; i++, p++)
+		for (i = 0;i < 4;i++, p++)
 		{
 			ch = p->FileName[0];	//取文件(目录)名的第一个字符
 			if (ch == (char)0xe5)		//空目录项
@@ -644,16 +774,16 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 				if (attrib != cc)		//只显示指定属性的文件
 					continue;
 			}
-			cout << setiosflags(ios::left) << setw(20) << p->FileName;
+			sstream << setiosflags(ios::left) << setw(20) << p->FileName;
 			if (p->Fattrib >= '\20')	//是子目录
 			{
-				cout << "<DIR>\n";
+				sstream << "<DIR>\n";
 				dircount++;
 			}
 			else
 			{
-				cout << resetiosflags(ios::left);
-				cout << setiosflags(ios::right) << setw(10) << p->Fsize << endl;
+				sstream << resetiosflags(ios::left);
+				sstream << setiosflags(ios::right) << setw(10) << p->Fsize << endl;
 				filecount++;
 				fsizecount += p->Fsize;
 			}
@@ -661,11 +791,31 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 		if (ch == '\0') break;
 		s = FAT[s];		//指向该目录的下一个盘块
 	}
-	cout << resetiosflags(ios::left) << endl;
-	cout << setiosflags(ios::right) << setw(6) << filecount << " file(s)";
-	cout << setw(8) << fsizecount << " bytes" << endl;
-	cout << setw(6) << dircount << " dir(s) " << setw(8) << SIZE * FAT[0];
-	cout << " free" << endl;
+	sstream << resetiosflags(ios::left) << endl;
+	sstream << setiosflags(ios::right) << setw(6) << filecount << " file(s)";
+	sstream << setw(8) << fsizecount << " bytes" << endl;
+	sstream << setw(6) << dircount << " dir(s) " << setw(8) << SIZE * FAT[0];
+	sstream << " free" << endl;
+	strResult = sstream.str();
+	if (typeflag == 1)
+	{
+		cout << strResult;
+	}
+	else if (typeflag == 2)
+	{
+		char* Buffer = new char[strResult.length() + 1];
+		strcpy(Buffer, strResult.c_str());
+		buffer_to_file(fcbp, Buffer);
+	}
+	else
+	{
+		short len = fcbp->Fsize;
+		char* Buffer = new char[len + strResult.length() + 2];
+		file_to_buffer(fcbp, Buffer);
+		strcat(Buffer, "\n");
+		strcat(Buffer, strResult.c_str());
+		buffer_to_file(fcbp, Buffer);
+	}
 	return 1;
 }
 
@@ -932,9 +1082,34 @@ int RdComd(int k)
 
 int TypeComd(int k)		//type命令处理函数(显示文件内容)
 {
+	if (k > 3 || k == 2)
+	{
+		cout << "\n命令错误：参数个数错误。\n";
+		return -1;
+	}
 	// 显示文件内容：type <文件名>，显示指定文件的内容。
 	// 若指定文件不存在，则给出错误信息。
-
+	if (k == 3)
+	{
+		if (strcmp(comd[2], ">") == 0)
+		{
+			strcpy(comd[2], comd[3]);
+			CopyComd(2);
+		}
+		else if (strcmp(comd[2], ">>") == 0)
+		{
+			strcat(comd[1], "+");
+			strcat(comd[1], comd[3]);
+			strcpy(comd[2], comd[3]);
+			CopyComd(2);
+		}
+		else
+		{
+			cout << "\n命令错误。\n";
+			return -1;
+		}
+		return 1;
+	}
 	short i, s, size, jj = 0;
 	char attrib = '\0', * FileName;
 	char* Buffer;
@@ -1098,10 +1273,10 @@ int CreateComd(int k)		//create命令处理函数：建立新文件
 		cout << "\n命令中的新文件名错误。\n";
 		return -2;
 	}
-	s0 = FindFCB(FileName, s, attrib, fcbp1);	//取FileName的首块号(查其存在性)
-	if (s0 > 0)
+	s0 = FindFCB(FileName, s, '\040' , fcbp1);	//取FileName的首块号(查其存在性)
+	if (s0 >= 0)
 	{
-		cout << "\n有同名文件，不能建立。\n";
+		cout << "\n有同名文件或目录，不能建立。\n";
 		return -2;
 	}
 	strcpy(gFileName, temppath);
