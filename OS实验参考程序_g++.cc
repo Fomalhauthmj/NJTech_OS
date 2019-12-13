@@ -1679,23 +1679,48 @@ int ReadComd(int k)  //read命令的处理函数：读文件
             return 1;
         }
         readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
-    } else                                   //k=2或k=3的情况
-    {
-        pos = atoi(comd[2]);  //从命令中指定位置写
-        if (pos <= 0 || pos > uof[i_uof].fsize) {
-            cout << "\n命令中提供的读位置错误。\n";
-            return -3;
-        }
-        readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
-        if (k == 3) {
-            readc = atoi(comd[3]);
+    } else if (k == 2) {
+        if (string(comd[2]).substr(0, 2) == "|p") {
+            pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
+            if (pos <= 0 || pos > uof[i_uof].fsize) {
+                cout << "\n命令中提供的读位置错误。\n";
+                return -3;
+            }
+            readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
+        } else if (string(comd[2]).substr(0, 2) == "|l") {
+            readc = atoi(string(comd[2]).substr(2).c_str());
             if (readc < 1) {
                 cout << "\n命令中提供的读字节数错误。\n";
                 return -4;
             }
             if (readc > uof[i_uof].fsize - pos + 1)
                 readc = uof[i_uof].fsize - pos + 1;
+            pos = uof[i_uof].readp;  //从读指针所指位置开始读
+            if (pos > uof[i_uof].fsize) {
+                cout << "\n读指针已指向文件尾部，无可读信息。\n";
+                return 1;
+            }
+        } else {
+            cout << "\n参数设置错误 \n";
+            return -1;
         }
+    } else {  // k == 3
+        if (string(comd[2]).substr(0, 2) != "|p" || string(comd[3]).substr(0, 2) != "|l") {
+            cout << "\n参数设置错误 \n";
+            return -1;
+        }
+        pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
+        if (pos <= 0 || pos > uof[i_uof].fsize) {
+            cout << "\n命令中提供的读位置错误。\n";
+            return -3;
+        }
+        readc = atoi(string(comd[3]).substr(2).c_str());
+        if (readc < 1) {
+            cout << "\n命令中提供的读字节数错误。\n";
+            return -4;
+        }
+        if (readc > uof[i_uof].fsize - pos + 1)
+            readc = uof[i_uof].fsize - pos + 1;
     }
     bnum = (pos - 1) / SIZE;    //从文件的第bnum块读(bnum从0开始编号)
     offset = (pos - 1) % SIZE;  //在第bnum块的偏移位置offset处开始读(offset从0开始)
