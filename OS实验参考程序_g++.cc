@@ -101,6 +101,11 @@ struct UnDel  //恢复被删除文件表的数据结构
                                 //首块号也存于fb所指的盘块中
 };
 
+struct CurFile  //定义当前操作文件的数据结构
+{
+    char cpath[PATH_LEN];  //当前操作文件绝对路径字符串(全路径名)
+};
+
 //关于恢复被删除文件问题，还可以采用类似于Windows的回收站的方法。例如可以在根目录中
 //建立一个特殊的文件夹recycled (其属性为：只读、隐藏、系统)，其FCB记录结构中的成员
 //Fsize，不用来存储文件长度，而用来存储一个盘块号，该盘块中存储文件长度和文件的全路
@@ -128,7 +133,8 @@ short ffbp = 1;
 //	short ffbp;		//从该位置开始查找空闲盘快(类似循环首次适应分配)
 //	short Udelp;	//udtab表的第一个空表项的下标
 
-int dspath = 1;  //dspath=1,提示符中显示当前目录
+int dspath = 1;   //dspath=1,提示符中显示当前目录
+CurFile curFile;  //当前操作文件
 
 //函数原型说明
 int CreateComd(int);                     //create命令处理函数
@@ -172,6 +178,7 @@ int file_to_buffer(FCB* fcbp, char* Buffer);  //文件内容读到Buffer,返回�
 int ParseCommand(char*);                      //将输入的命令行分解成命令和参数等
 void ExecComd(int);                           //执行命令
 int MoveComd(int);                            // move命令
+void ChangeCurFile(char* path);
 
 //#define INIT	//决定初始化还是从磁盘读入
 
@@ -1197,8 +1204,8 @@ int getblock()  //获得一个空闲盘块，供fappend()函数调用
 ////////////////////////////////////////////////////////////////
 
 // 迭代比较
-bool ItStrCmp(char s[], char t[], int sz) {
-    int ls = strlen(s), lt = strlen(t), i, d = 'a' - 'A';
+bool ItStrCmp(string s, string t, int sz) {
+    int ls = s.length(), lt = t.length(), i, d = 'a' - 'A';
     if (ls < sz)
         return 0;
     char *s1 = new char[ls + 1], *t1 = new char[lt + 1];
@@ -1237,15 +1244,29 @@ int WriteComd(int k)  //write命令的处理函数
     // 对于“insert”，输入ins、inse、inser、insert(不区分大小写)都可以，输入其它不行。
 
 #define BSIZE 40 * SIZE + 1
-    short int ii, ii_uof, len0, len, len1, pos, ins = 0;
-    short int bn0, bn1, jj, count = 0;
+    int i, ii, ii_uof, len0, len, len1, pos, del_len, ins = 0, app = 0, pflag = 0, lflag = 0, del = 0;
+    int bn0, bn1, jj, count = 0;
     char attrib = '\0', Buffer[BSIZE];  //为方便计，假设一次最多写入2560字节
     char* buf;
     FCB* fcbp;
 
-    if (k < 1) {
-        cout << "\n命令中没有文件名。\n";
-        return -1;
+    if (k == 0) {
+        strcpy(comd[1], curFile.cpath);
+        k = 1;
+    } else if (comd[1][0] != '|') {
+        if (k < 1 || k > 4) {
+            cout << "\n命令中参数个数太多或太少。\n";
+            return -1;
+        }
+    } else {
+        if (k > 3) {
+            cout << "\n命令中参数个数太多或太少。\n";
+            return -1;
+        }
+        for (i = k; i > 0; --i)
+            strcpy(comd[i + 1], comd[i]);
+        strcpy(comd[1], curFile.cpath);
+        ++k;
     }
     FindPath(comd[1], attrib, 0, fcbp);  //构成全路径且去掉“..”存于temppath中
     ii_uof = Check_UOF(temppath);        //查UOF
@@ -1258,30 +1279,56 @@ int WriteComd(int k)  //write命令的处理函数
              << temppath << "是只读文件，不能写。\n";
         return -3;
     }
-    if (k == 1)
-        pos = uof[ii_uof].writep;  //从写指针所指位置开始写(write <文件名>)
-    else                           //k=2或3
-    {
-        if (ItStrCmp(comd[2], "append", 3))
+    pos = uof[ii_uof].writep;  //从写指针所指位置开始写(write <文件名>)
+    del_len = 1e9 + 7;         // 默认删到文件尾
+    for (i = 2; i <= k; ++i) {
+        if (ItStrCmp(comd[i], "|delete", 4)) {
+            del = 1;
+        } else if (ItStrCmp(comd[i], "|append", 4)) {
             pos = uof[ii_uof].fsize + 1;  //文件尾部添加模式(write <文件名> append)
-        else if (ItStrCmp(comd[2], "insert", 3)) {
-            pos = uof[ii_uof].writep;  //从当前写指针位置开始写
-            ins = 1;                   //插入模式(write <文件名> insert)
-        } else {
-            pos = atoi(comd[2]);  //从命令中指定位置写(write <文件名> <n>)
+            app = 1;
+        } else if (ItStrCmp(comd[i], "|insert", 4)) {
+            ins = 1;  //插入模式(write <文件名> insert)
+        } else if (string(comd[i]).substr(0, 2) == "|p") {
+            pos = atoi(string(comd[i]).substr(2).c_str());  //从命令中指定位置写(write <文件名> <n>)
             if (pos <= 0) {
                 cout << "\n命令中提供的写入位置错误。\n";
                 return -4;
             }
-            if (k == 3) {
-                if (ItStrCmp(comd[3], "insert", 3))
-                    ins = 1;  //插入模式(write <文件名> <n> insert)
-                else {
-                    cout << "\n命令参数" << comd[2] << "," << comd[3] << "错误\n";
-                    return -5;
-                }
+            pflag = 1;
+        } else if (string(comd[i]).substr(0, 2) == "|l") {
+            del_len = atoi(string(comd[i]).substr(2).c_str());
+            if (del_len <= 0) {
+                cout << "\n无需删除。\n";
+                return -4;
             }
+            lflag = 1;
+        } else {
+            cout << "\n命令错误：参数未识别。\n";
+            return -1;
         }
+    }
+    // 将命令进行状态压缩
+    int flags[] = {ins, app, del, 0, pflag, lflag, 0, 0}, flag_cnt = sizeof(flags) / sizeof(int), state = 0;
+    for (i = 0; i < flag_cnt; ++i)
+        state |= flags[i] << i;  // 当前组合方案
+    // 可行的组合方案
+    const int ok_flags[] = {0b00000000,
+                            0b00010000,
+                            0b00000001,
+                            0b00010001,
+                            0b00000010,
+                            0b00000100,
+                            0b00010100,
+                            0b00100100,
+                            0b00110100},
+              ok_cnt = sizeof(ok_flags) / sizeof(int);
+    for (i = 0; i < ok_cnt; ++i)
+        if (state == ok_flags[i])
+            break;
+    if (i >= ok_cnt) {
+        cout << "\n命令组合错误。\n";
+        return -6;
     }
     if (pos <= 0) {
         cout << "\n命令中提供的写入位置错误。\n";
@@ -1294,53 +1341,77 @@ int WriteComd(int k)  //write命令的处理函数
 
     pos--;  //使pos从0开始
 
-    cout << "\n请输入写入文件的内容(最多允许输入" << sizeof(Buffer) - 1 << "个字节)：\n";
-    cin.getline(Buffer, BSIZE);
-    len1 = strlen(Buffer);
-    if (len1 == 0)  //输入长度为0,不改变文件
-        return 0;
-    fcbp = uof[ii_uof].fp;
-    len0 = uof[ii_uof].fsize;  //取文件原来的长度值
-    if (len0 == 0)             //若是空文件
-    {
-        ii = buffer_to_file(fcbp, Buffer);
-        if (ii == 0)  //写文件失败
-            return ii;
+    if (!del) {
+        cout << "\n请输入写入文件的内容(最多允许输入" << sizeof(Buffer) - 1 << "个字节)：\n";
+        cin.getline(Buffer, BSIZE);
+        len1 = strlen(Buffer);
+        if (len1 == 0)  //输入长度为0,不改变文件
+            return 0;
+        fcbp = uof[ii_uof].fp;
+        len0 = uof[ii_uof].fsize;  //取文件原来的长度值
+        if (len0 == 0)             //若是空文件
+        {
+            ii = buffer_to_file(fcbp, Buffer);
+            if (ii == 0)  //写文件失败
+                return ii;
+            uof[ii_uof].fsize = uof[ii_uof].fp->Fsize;
+            uof[ii_uof].faddr = uof[ii_uof].fp->Addr;
+            uof[ii_uof].readp = 1;
+            uof[ii_uof].writep = uof[ii_uof].fsize + 1;
+            return 1;
+        }
+        //以下处理文件非空的情况
+        len = len1 + pos + ins * (len0 - pos);         //计算写入完成后文件的长度
+        bn0 = len0 / SIZE + (short)(len0 % SIZE > 0);  //文件原来占用的盘块数
+        bn1 = len / SIZE + (short)(len % SIZE > 0);    //写入后文件将占用的盘块数
+        if (FAT[0] < bn1 - bn0) {
+            cout << "\n磁盘空间不足,不能写入文件.\n";
+            return -1;
+        }
+        buf = new char[len + 1];
+        if (buf == 0) {
+            cout << "\n分配内存失败。\n";
+            return -1;
+        }
+        file_to_buffer(fcbp, buf);  //文件读到buf
+        if (ins)                    //若是插入方式
+        {
+            for (ii = len0; ii >= pos; ii--)
+                buf[ii + len1] = buf[ii];  //后移,空出后插入Buffer
+            jj = pos;
+            ii = 0;
+            while (Buffer[ii] != '\0')  //Buffer插入到buf
+                buf[jj++] = Buffer[ii++];
+        } else  //若是改写方式
+            strcpy(&buf[pos], Buffer);
+        buffer_to_file(fcbp, buf);
+        delete[] buf;
         uof[ii_uof].fsize = uof[ii_uof].fp->Fsize;
-        uof[ii_uof].faddr = uof[ii_uof].fp->Addr;
-        uof[ii_uof].readp = 1;
         uof[ii_uof].writep = uof[ii_uof].fsize + 1;
-        return 1;
+    } else {  // 删除
+        fcbp = uof[ii_uof].fp;
+        len0 = uof[ii_uof].fsize;  //取文件原来的长度值
+        if (len0 == 0)             //若是空文件
+            return 0;
+        del_len = min(del_len, len0 - pos);
+        if (!del_len)
+            return 0;  // 删除长度为0，无需删除
+        buf = new char[len0 + 1];
+        if (buf == 0) {
+            cout << "\n分配内存失败。\n";
+            return -1;
+        }
+        file_to_buffer(fcbp, buf);  //文件读到buf
+        strcpy(buf + pos, buf + pos + del_len);
+        buf[len0 - del_len] = '\0';
+        buffer_to_file(fcbp, buf);
+        delete[] buf;
+        uof[ii_uof].fsize = uof[ii_uof].fp->Fsize;
+        uof[ii_uof].writep = uof[ii_uof].fsize + 1;
     }
-    //以下处理文件非空的情况
-    len = len1 + pos + ins * (len0 - pos);         //计算写入完成后文件的长度
-    bn0 = len0 / SIZE + (short)(len0 % SIZE > 0);  //文件原来占用的盘块数
-    bn1 = len / SIZE + (short)(len % SIZE > 0);    //写入后文件将占用的盘块数
-    if (FAT[0] < bn1 - bn0) {
-        cout << "\n磁盘空间不足,不能写入文件.\n";
-        return -1;
-    }
-    buf = new char[len + 1];
-    if (buf == 0) {
-        cout << "\n分配内存失败。\n";
-        return -1;
-    }
-    file_to_buffer(fcbp, buf);  //文件读到buf
-    if (ins)                    //若是插入方式
-    {
-        for (ii = len0; ii >= pos; ii--)
-            buf[ii + len1] = buf[ii];  //后移,空出后插入Buffer
-        jj = pos;
-        ii = 0;
-        while (Buffer[ii] != '\0')  //Buffer插入到buf
-            buf[jj++] = Buffer[ii++];
-    } else  //若是改写方式
-        strcpy(&buf[pos], Buffer);
-    buffer_to_file(fcbp, buf);
-    delete[] buf;
-    uof[ii_uof].fsize = uof[ii_uof].fp->Fsize;
-    uof[ii_uof].writep = uof[ii_uof].fsize + 1;
+
     cout << "\n写文件" << uof[ii_uof].fname << "成功.\n";
+    ChangeCurFile(temppath);
     return 1;
 }
 
@@ -1676,9 +1747,23 @@ int ReadComd(int k)  //read命令的处理函数：读文件
     char Buffer[SIZE + 1];
     FCB* fcbp;
 
-    if (k < 1 || k > 3) {
-        cout << "\n命令中参数个数太多或太少。\n";
-        return -1;
+    if (k == 0) {
+        strcpy(comd[1], curFile.cpath);
+        k = 1;
+    } else if (comd[1][0] != '|') {
+        if (k < 1 || k > 3) {
+            cout << "\n命令中参数个数太多或太少。\n";
+            return -1;
+        }
+    } else {
+        if (k > 2) {
+            cout << "\n命令中参数个数太多或太少。\n";
+            return -1;
+        }
+        for (i = k; i > 0; --i)
+            strcpy(comd[i + 1], comd[i]);
+        strcpy(comd[1], curFile.cpath);
+        ++k;
     }
     FindPath(comd[1], attrib, 0, fcbp);  //构成全路径且去掉“..”存于temppath中
     i_uof = Check_UOF(temppath);         //查UOF
@@ -1767,6 +1852,7 @@ int ReadComd(int k)  //read命令的处理函数：读文件
     }
     cout << endl;
     uof[i_uof].readp = pos + readc;  //调整读指针
+    ChangeCurFile(temppath);
     return 1;
 }
 
@@ -2534,6 +2620,13 @@ int ParseCommand(char* p)  //将输入的命令行分解成命令和参数等
         k++;  //多出一个参数
     }
     return k;
+}
+
+/////////////////////////////////////////////////////////////////
+
+void ChangeCurFile(char* path) {
+    strcpy(curFile.cpath, path);
+    //cout << "cur file->" << curFile.cpath << endl;
 }
 
 /////////////////////////////////////////////////////////////////
