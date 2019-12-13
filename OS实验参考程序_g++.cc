@@ -1196,6 +1196,25 @@ int getblock()  //获得一个空闲盘块，供fappend()函数调用
 
 ////////////////////////////////////////////////////////////////
 
+// 迭代比较
+bool ItStrCmp(char s[], char t[], int sz) {
+    int ls = strlen(s), lt = strlen(t), i, d = 'a' - 'A';
+    if (ls < sz)
+        return 0;
+    char *s1 = new char[ls + 1], *t1 = new char[lt + 1];
+    for (i = 0; i <= ls; ++i)
+        s1[i] = (s[i] >= 'A' && s[i] <= 'Z') ? (s[i] + d) : s[i];
+    for (i = 0; i <= lt; ++i)
+        t1[i] = (t[i] >= 'A' && t[i] <= 'Z') ? (t[i] + d) : t[i];
+    for (i = 0; s1[i]; ++i)
+        if (s1[i] != t1[i]) {
+            delete[] s1, t1;
+            return 0;
+        }
+    delete[] s1, t1;
+    return 1;
+}
+
 int WriteComd(int k)  //write命令的处理函数
 {
     // 写文件：write <文件名> [<位置>[ insert]]，命令中若无"位置"参数，则在写指
@@ -1243,9 +1262,9 @@ int WriteComd(int k)  //write命令的处理函数
         pos = uof[ii_uof].writep;  //从写指针所指位置开始写(write <文件名>)
     else                           //k=2或3
     {
-        if (strncasecmp(comd[2], "app", 3) == 0)
+        if (ItStrCmp(comd[2], "append", 3))
             pos = uof[ii_uof].fsize + 1;  //文件尾部添加模式(write <文件名> append)
-        else if (strncasecmp(comd[2], "ins", 3) == 0) {
+        else if (ItStrCmp(comd[2], "insert", 3)) {
             pos = uof[ii_uof].writep;  //从当前写指针位置开始写
             ins = 1;                   //插入模式(write <文件名> insert)
         } else {
@@ -1255,7 +1274,7 @@ int WriteComd(int k)  //write命令的处理函数
                 return -4;
             }
             if (k == 3) {
-                if (strncasecmp(comd[3], "ins", 3) == 0)
+                if (ItStrCmp(comd[3], "insert", 3))
                     ins = 1;  //插入模式(write <文件名> <n> insert)
                 else {
                     cout << "\n命令参数" << comd[2] << "," << comd[3] << "错误\n";
@@ -1680,15 +1699,15 @@ int ReadComd(int k)  //read命令的处理函数：读文件
         }
         readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
     } else if (k == 2) {
-        if (string(comd[2]).substr(0, 2) == "|p") {
-            pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
+        if (string(comd[2]).substr(0, 1) == "p") {
+            pos = atoi(string(comd[2]).substr(1).c_str());  //从命令中指定位置写
             if (pos <= 0 || pos > uof[i_uof].fsize) {
                 cout << "\n命令中提供的读位置错误。\n";
                 return -3;
             }
             readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
-        } else if (string(comd[2]).substr(0, 2) == "|l") {
-            readc = atoi(string(comd[2]).substr(2).c_str());
+        } else if (string(comd[2]).substr(0, 1) == "l") {
+            readc = atoi(string(comd[2]).substr(1).c_str());
             if (readc < 1) {
                 cout << "\n命令中提供的读字节数错误。\n";
                 return -4;
@@ -1705,16 +1724,16 @@ int ReadComd(int k)  //read命令的处理函数：读文件
             return -1;
         }
     } else {  // k == 3
-        if (string(comd[2]).substr(0, 2) != "|p" || string(comd[3]).substr(0, 2) != "|l") {
+        if (string(comd[2]).substr(0, 1) != "p" || string(comd[3]).substr(0, 1) != "l") {
             cout << "\n参数设置错误 \n";
             return -1;
         }
-        pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
+        pos = atoi(string(comd[2]).substr(1).c_str());  //从命令中指定位置写
         if (pos <= 0 || pos > uof[i_uof].fsize) {
             cout << "\n命令中提供的读位置错误。\n";
             return -3;
         }
-        readc = atoi(string(comd[3]).substr(2).c_str());
+        readc = atoi(string(comd[3]).substr(1).c_str());
         if (readc < 1) {
             cout << "\n命令中提供的读字节数错误。\n";
             return -4;
