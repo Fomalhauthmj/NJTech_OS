@@ -59,7 +59,8 @@ using namespace std;
 //定义若干符号常量
 #define S 32			//假设最多同时打开32个文件 
 #define K 5000			//假设磁盘共有5000个盘块
-#define SIZE 64			//假设磁盘的大小是64字节
+//#define SIZE 64			//假设磁盘的大小是64字节
+#define SIZE 256
 #define CK 8			//命令分解后的段数
 #define INPUT_LEN 128	//输入缓冲区长度
 #define COMMAND_LEN 11	//命令字符串长度
@@ -94,6 +95,7 @@ struct CurPath		//定义存储当前目录的数据结构
 	char cpath[PATH_LEN];		//当前目录绝对路径字符串(全路径名)
 };
 
+/*
 struct UnDel		//恢复被删除文件表的数据结构
 {
 	char gpath[PATH_LEN];		//被删除文件的全路径名(不含文件名)
@@ -101,6 +103,18 @@ struct UnDel		//恢复被删除文件表的数据结构
 	short ufaddr;				//被删除文件名的首块号
 	short fb;					//存储被删除文件块号的第一个块号(链表头指针)
 								//首块号也存于fb所指的盘块中
+};
+*/
+//4.15 方案2
+struct UnDel		//恢复被删除文件表的数据结构(共128字节,110+11+1+2+2+2=128)
+{
+	char gpath[110];		//被删除文件的全路径名(不含文件名)
+	char ufname[FILENAME_LEN];	//被删除文件名
+	char ufattr;				//被删除文件属性
+	short ufaddr;				//被删除文件名的首块号
+	short fb;					//存储被删除文件块号的第一个块号(链表头指针)
+								//首块号也存于fb所指的盘块中
+	short ufsize;				//被删除文件大小
 };
 
 struct CurFile		//定义当前操作文件的数据结构
@@ -126,7 +140,7 @@ UOF uof[S];						//用户打开文件表UOF,最多同时打开S个文件
 char comd[CK][PATH_LEN];		//分析命令时使用
 char temppath[PATH_LEN];		//临时路径(全路径)
 CurPath curpath;
-UnDel udtab[DM];				//定义删除文件恢复表，退出系统时该表可存于文件UdTab.dat中
+UnDel* udtab;				//定义删除文件恢复表，退出系统时该表可存于文件UdTab.dat中
 short Udelp = 0;				//udtab表的第一个空表项的下标，系统初始化时它为0。
 								//当Udelp=DM时，表示表已满，需清除最早的表项(后续表项依次前移)
 short ffbp = 1;
@@ -329,7 +343,7 @@ int main()
 
 	// 读入文件分配表FAT
 	char yn;
-	ifstream ffi("FAT.txt", ios::_Nocreate);//打开文件FAT.txt
+	ifstream ffi("FAT256G.txt", ios::_Nocreate);//打开文件FAT.txt
 	if (!ffi)
 	{
 		cout << "Can't open FAT.txt!\n";
@@ -344,7 +358,7 @@ int main()
 	ffi.close();
 
 	//读入磁盘块Disk[ ]信息
-	ffi.open("Disk.dat", ios::binary | ios::_Nocreate);
+	ffi.open("Disk256G.dat", ios::binary | ios::_Nocreate);
 	if (!ffi)
 	{
 		cout << "Can't open Disk.dat!\n";
@@ -359,6 +373,7 @@ int main()
 	ffi.close();
 
 	//读入恢复删除文件表UdTab.dat信息
+	/*
 	ffi.open("UdTab.dat", ios::binary | ios::_Nocreate);
 	if (!ffi)
 	{
@@ -372,11 +387,13 @@ int main()
 		else
 			break;
 	ffi.close();
-
+	*/
+	int b0 = 4980;
+	udtab = (UnDel*)Disk[b0];
 	short* pp = (short*)Disk[0];
 	ffbp = pp[0];
-	Udelp = pp[1];
-
+	Udelp = 0;
+	//cout << Udelp << endl;
 #endif
 
 	for (i = 0; i < S; i++)		//初始化UOF。state：0＝空表项；1＝新建；2＝打开
@@ -755,7 +772,7 @@ int DirComd(int k)	//dir命令，显示指定目录的内容（文件名或目�
 	while (s > 0)
 	{
 		p = (FCB*)Disk[s];	//p指向该目录的第一个盘块
-		for (i = 0;i < 4;i++, p++)
+		for (i = 0; i < 16; i++, p++)
 		{
 			ch = p->FileName[0];	//取文件(目录)名的第一个字符
 			if (ch == (char)0xe5)		//空目录项
@@ -1030,7 +1047,7 @@ int RdComd(int k)
 	while (s > 0)		//循环查找，直到目录尾部
 	{
 		p = (FCB*)Disk[s];
-		for (i = 0; i < 4; i++, p++)
+		for (i = 0; i < 16; i++, p++)
 		{
 			if (p->FileName[0] != (char)0xe5 && p->FileName[0] != '\0')//累计非空目录项
 				count++;
@@ -1059,7 +1076,7 @@ int RdComd(int k)
 	while (s > 0)				//整理DirName的父目录空间(回收无目录项的盘块)
 	{
 		p = (FCB*)Disk[s];
-		for (j = i = 0; i < 4; i++, p++)
+		for (j = i = 0; i < 16; i++, p++)
 			if (p->FileName[0] != (char)0xe5 && p->FileName[0] != '\0')//累计非空目录项
 				j++;
 		if (j == 0)
@@ -1219,7 +1236,7 @@ int FindBlankFCB(short s, FCB * &fcbp1)	//寻找首块号为s的目录中的空�
 	while (s > 0)			//在首块号为s的目录找空登记栏，直到目录尾部
 	{
 		fcbp1 = (FCB*)Disk[s];
-		for (i = 0; i < 4; i++, fcbp1++)
+		for (i = 0; i < 16; i++, fcbp1++)
 			if (fcbp1->FileName[0] == (char)0xe5 || fcbp1->FileName[0] == '\0')
 			{
 				fcbp1->Addr = fcbp1->Fsize = 0;		//假设为空目录项
@@ -1241,7 +1258,7 @@ int FindBlankFCB(short s, FCB * &fcbp1)	//寻找首块号为s的目录中的空�
 	}
 	FAT[s0] = s;		//构成FAT链
 	fcbp1 = (FCB*)Disk[s];
-	for (i = 0; i < 4; i++, fcbp1++)
+	for (i = 0; i < 16; i++, fcbp1++)
 		fcbp1->FileName[0] = '\0';	//置空目录标志
 	fcbp1 = (FCB*)Disk[s];
 	fcbp1->Addr = fcbp1->Fsize = 0;		//假设为空目录项
@@ -1685,6 +1702,8 @@ int PutUdtab(FCB * fp)
 	}
 	strcpy(udtab[Udelp].gpath, temppath);
 	strcpy(udtab[Udelp].ufname, fp->FileName);
+	udtab[Udelp].ufattr = fp->Fattrib;
+	udtab[Udelp].ufsize = fp->Fsize;
 	bb = udtab[Udelp].ufaddr = fp->Addr;
 	udtab[Udelp].fb = SAVE_bn(bb);	//保存被删除文件的盘块号
 	Udelp++;						//调整指针位置
@@ -1726,7 +1745,7 @@ int DelComd(int k)			//del(删除文件)命令处理函数
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
-			for (i = 0; i < 4; i++, fcbp1++)
+			for (i = 0; i < 16; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -1821,8 +1840,9 @@ int Udfile(FCB * fdp, short s0, char* fn, short& cc)
 			&& udtab[i].ufaddr == fdp->Addr)
 		{
 			cout << "\n文件" << udtab[i].ufname << "可能可以恢复，是否恢复它？(y/n) ";
-			cin.getline(yn, 10);
-			if (yn[0] == 'y' || yn[0] == 'Y')
+			char yn;
+			cin >> yn;
+			if (yn == 'y' || yn == 'Y')
 			{
 				if (udtab[i].ufaddr > 0)
 				{
@@ -1905,40 +1925,61 @@ int UndelComd(int k)		//undel命令
 	//		undel——恢复当前目录中被删除的文件
 	//		undel <目录名>——恢复指定目录中被删除的文件
 
-	short i, s, s0, cc = 0;		//cc是恢复文件计数变量
+	short i, s, s0, cc = 0, j;		//cc是恢复文件计数变量
 	char* fn;
 	FCB* fcbp1;
-	if (k > 1)
+	if (k >= 1)
 	{
 		cout << "\n命令不能有参数。\n";
 		return -1;
 	}
-	if (k < 1)		//若命令中无参数
+	int init_len = Udelp;
+	for (int i = 0; i < init_len; i++)
 	{
-		strcpy(temppath, curpath.cpath);
-		s0 = s = curpath.fblock;
-	}
-	else
-	{
-		s0 = s = FindPath(comd[1], '\020', 1, fcbp1);
+		char* path = new char[PATH_LEN];
+		strcpy(path, udtab[i].gpath);
+		s0 = s = FindPath(path, '\020', 1, fcbp1);
 		if (s < 0)
 		{
-			cout << "\n命令中所给的路径错误。\n";
-			return -2;
+			cout << "\n表项路径错误。\n";
+			continue;
 		}
-	}
-	while (s > 0)			//在首块号为s的目录找被删除文件的表项，直到目录尾部
-	{
-		fcbp1 = (FCB*)Disk[s];
-		for (i = 0; i < 4; i++, fcbp1++)
+		bool flag = false;
+		while (s > 0)			//在首块号为s的目录找被删除文件的表项，直到目录尾部
 		{
-			if (fcbp1->FileName[0] == (char)0xe5)		//找到可能进行删除恢复的目录项
+			fcbp1 = (FCB*)Disk[s];
+			for (j = 0; j < 16; j++, fcbp1++)
 			{
+				if (fcbp1->FileName[0] == (char)0xe5)		//找到可能进行删除恢复的目录项
+				{
+					fn = &(fcbp1->FileName[1]);
+					//cout << "1:" << fn << endl;当前搜索目录项
+					//cout << "2:" << &udtab[i].ufname[1] << endl;当前目标目录项
+					if (!strcmp(fn, &udtab[i].ufname[1])&&fcbp1->Addr==udtab[i].ufaddr)
+					{
+						flag = true;
+						Udfile(fcbp1, s0, fn, cc);
+					}
+				}
+			}
+			s = FAT[s];	//取下一个盘块号
+		}
+		if (!flag)//未搜索到匹配目录项 即目录项已经被占用 新建目录项恢复
+		{
+			cout << "\n文件"<<udtab[i].ufname<<"原目录项已经被占用，是否仍要恢复？（y/n）\n";
+			char choice;
+			cin >> choice;
+			if (choice == 'y' || choice == 'Y')
+			{
+				FindBlankFCB(s0, fcbp1);
+				fcbp1->Addr = udtab[i].ufaddr, fcbp1->Fattrib = udtab[i].ufattr, fcbp1->Fsize = udtab[i].ufsize;
+				strcpy(fcbp1->FileName, udtab[i].ufname);
+				fcbp1->FileName[0] = (char)0xe5;
 				fn = &(fcbp1->FileName[1]);
 				Udfile(fcbp1, s0, fn, cc);
 			}
 		}
-		s = FAT[s];	//取下一个盘块号
+		delete[] path;
 	}
 	cout << "\n共恢复了 " << cc << " 个被删除的文件。\n";
 	return 1;
@@ -2106,7 +2147,7 @@ int CopyComd(int k)		//copy命令的处理函数：复制文件
 				strcat(comd[2], "/");
 			strcpy(target_path, comd[2]);
 			strcpy(base_path, comd[2]);
-			for (i = 0; i < 4; i++, fcbp1++)
+			for (i = 0; i < 16; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -2659,7 +2700,7 @@ int AttribComd(int k)	//attrib命令的处理函数：修改文件或目录属�
 		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
 		{
 			FCB* fcbp1 = (FCB*)Disk[s];
-			for (i = 0; i < 4; i++, fcbp1++)
+			for (i = 0; i < 16; i++, fcbp1++)
 				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0')
 				{
 					char* FilePath = new char[PATH_LEN];
@@ -2875,7 +2916,7 @@ int FindFCB(char* Name, int s, char attrib, FCB * &fcbp)
 	while (s > 0)
 	{
 		fcbp = (FCB*)Disk[s];
-		for (i = 0; i < 4; i++, fcbp++)		//每个盘块4个目录项
+		for (i = 0; i < 16; i++, fcbp++)		//每个盘块4个目录项
 		{
 			ch = fcbp->FileName[0];
 			if (ch == (char)0xe5)
@@ -3086,12 +3127,12 @@ void UdTabComd(void)			//udtab命令
 	//显示删除文件恢复表udtab的内容
 
 	cout << "\n恢复被删除文件信息表(UdTab)内容如下：\n\n";
-	cout << "文件路径名                      " << "文件名        "
+	cout << "文件路径名                      " << "文件名        "<<"文件大小      "<<"文件属性      "
 		<< "首块号      " << "存储块号" << endl;
 	for (int i = 0; i < Udelp; i++)
-		cout << setiosflags(ios::left) << setw(32) << udtab[i].gpath
-		<< setw(15) << udtab[i].ufname << setw(12) << udtab[i].ufaddr
-		<< setw(8) << udtab[i].fb << endl;
+		cout << setiosflags(ios::left) << setw(32) << udtab[i].gpath << "|"
+		<< setw(13) << udtab[i].ufname << "|" << setw(12) << (short)udtab[i].ufsize << "|" << setw(12) << (short)udtab[i].ufattr << "|" << setw(12) << udtab[i].ufaddr
+		<< "|" << setw(8) << udtab[i].fb << endl;
 }
 
 /////////////////////////////////////////////////////////////////
