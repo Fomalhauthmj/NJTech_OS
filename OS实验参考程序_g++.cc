@@ -1699,15 +1699,15 @@ int ReadComd(int k)  //read命令的处理函数：读文件
         }
         readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
     } else if (k == 2) {
-        if (string(comd[2]).substr(0, 1) == "p") {
-            pos = atoi(string(comd[2]).substr(1).c_str());  //从命令中指定位置写
+        if (string(comd[2]).substr(0, 2) == "|p") {
+            pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
             if (pos <= 0 || pos > uof[i_uof].fsize) {
                 cout << "\n命令中提供的读位置错误。\n";
                 return -3;
             }
             readc = uof[i_uof].fsize - pos + 1;  //读到文件尾部共需读readc个字节
-        } else if (string(comd[2]).substr(0, 1) == "l") {
-            readc = atoi(string(comd[2]).substr(1).c_str());
+        } else if (string(comd[2]).substr(0, 2) == "|l") {
+            readc = atoi(string(comd[2]).substr(2).c_str());
             if (readc < 1) {
                 cout << "\n命令中提供的读字节数错误。\n";
                 return -4;
@@ -1724,16 +1724,16 @@ int ReadComd(int k)  //read命令的处理函数：读文件
             return -1;
         }
     } else {  // k == 3
-        if (string(comd[2]).substr(0, 1) != "p" || string(comd[3]).substr(0, 1) != "l") {
+        if (string(comd[2]).substr(0, 2) != "|p" || string(comd[3]).substr(0, 2) != "|l") {
             cout << "\n参数设置错误 \n";
             return -1;
         }
-        pos = atoi(string(comd[2]).substr(1).c_str());  //从命令中指定位置写
+        pos = atoi(string(comd[2]).substr(2).c_str());  //从命令中指定位置写
         if (pos <= 0 || pos > uof[i_uof].fsize) {
             cout << "\n命令中提供的读位置错误。\n";
             return -3;
         }
-        readc = atoi(string(comd[3]).substr(1).c_str());
+        readc = atoi(string(comd[3]).substr(2).c_str());
         if (readc < 1) {
             cout << "\n命令中提供的读字节数错误。\n";
             return -4;
