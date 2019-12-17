@@ -54,6 +54,7 @@
 #include <string.h>	//strcpy(),_stricmp()
 #include <fstream>	//文件操作用
 #include <sstream>	//dir > <文件名>
+#include <algorithm>
 using namespace std;
 
 //定义若干符号常量
@@ -71,14 +72,22 @@ const char D_FLAG = 1 << 4, S_FLAG = 1 << 2, H_FLAG = 1 << 1, R_FLAG = 1 << 0, C
 
 struct FCB			//定义文件目录项FCB的结构(共16个字节)
 {
-    char fname[PATH_LEN];  //文件全路径名
-    char attr;             //文件属性，1=只可读；0=可读写
-    short int faddr;       //文件的首块号
-    short int fsize;       //文件大小(字节数)
-    FCB* fp;               //该文件的目录项指针
-    short int state;       //状态：0=空表项；1=新建；2=打开
-    short int readp;       //读指针，指向某个要读的字符位置，0=空文件
-    short int writep;      //写读指针，指向某个要写读的字符位置
+	char FileName[FILENAME_LEN];//文件名(1～10字节)
+	char Fattrib;				//文件属性
+	short int Addr;				//文件首块号
+	short int Fsize;			//文件长度
+};
+
+struct UOF			//定义用户打开文件表的结构
+{
+	char fname[PATH_LEN];		//文件全路径名
+	char attr;					//文件属性，1=只可读；0=可读写
+	short int faddr;			//文件的首块号
+	short int fsize;			//文件大小(字节数)
+	FCB* fp;					//该文件的目录项指针
+	short int state;			//状态：0=空表项；1=新建；2=打开
+	short int readp;			//读指针，指向某个要读的字符位置，0=空文件
+	short int writep;			//写读指针，指向某个要写读的字符位置
 };
 
 struct CurPath  //定义存储当前目录的数据结构
@@ -87,22 +96,7 @@ struct CurPath  //定义存储当前目录的数据结构
     char cpath[PATH_LEN];  //当前目录绝对路径字符串(全路径名)
 };
 
-struct UnDel  //恢复被删除文件表的数据结构
-{
-    char gpath[PATH_LEN];       //被删除文件的全路径名(不含文件名)
-    char ufname[FILENAME_LEN];  //被删除文件名
-    short ufaddr;               //被删除文件名的首块号
-    short fb;                   //存储被删除文件块号的第一个块号(链表头指针)
-                                //首块号也存于fb所指的盘块中
-};
 
-
-/*
-struct UnDel		//恢复被删除文件表的数据结构
-{
-    char cpath[PATH_LEN];  //当前操作文件绝对路径字符串(全路径名)
-};
-*/
 //4.15 方案2
 struct UnDel		//恢复被删除文件表的数据结构(共128字节,110+11+1+2+2+2=128)
 {
@@ -1873,7 +1867,7 @@ int Udfile(FCB * fdp, short s0, char* fn, short& cc)
 	// 失败。无论恢复成功与否，都将删除udtab中对应的表项。
 
 	int i, j;
-	char yn[11], Fname[INPUT_LEN];
+	char Fname[INPUT_LEN];
 	short* stp, b, b0, b1, s;
 	FCB* fcbp;
 
@@ -1968,7 +1962,7 @@ int UndelComd(int k)  //undel命令
 	//		undel——恢复当前目录中被删除的文件
 	//		undel <目录名>——恢复指定目录中被删除的文件
 
-	short i, s, s0, cc = 0, j;		//cc是恢复文件计数变量
+	short s, s0, cc = 0, j;		//cc是恢复文件计数变量
 	char* fn;
 	FCB* fcbp1;
 	if (k >= 1)
@@ -2246,7 +2240,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 	}
 
 	int path1_len = strlen(comd[1]);
-	char path11[PATH_LEN], path12[PATH_LEN], path2[PATH_LEN];
+	char path11[PATH_LEN], path12[PATH_LEN];
 	for (i = 0;i < path1_len;++i)
 	{
 		if (comd[1][i] == '+')
@@ -3341,13 +3335,6 @@ int ParseCommand(char* p)  //将输入的命令行分解成命令和参数等
         k++;  //多出一个参数
     }
     return k;
-}
-
-/////////////////////////////////////////////////////////////////
-
-void ChangeCurFile(char* path) {
-    strcpy(curFile.cpath, path);
-    //cout << "cur file->" << curFile.cpath << endl;
 }
 
 /////////////////////////////////////////////////////////////////
