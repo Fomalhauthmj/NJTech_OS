@@ -1,0 +1,4 @@
+cd /usr
+dir
+type boy
+copy boy user/box
