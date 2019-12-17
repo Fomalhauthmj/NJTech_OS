@@ -2940,7 +2940,7 @@ void save_FAT()  //保存文件分配表FAT到磁盘文件FAT.txt
 {
     int i;
     ofstream ffo;
-    ffo.open("FAT.txt");
+    ffo.open("FAT256G.txt");
     for (i = 0; i < K; i++)
         ffo << FAT[i] << ' ';
     ffo.close();
@@ -2954,7 +2954,7 @@ void save_Disk()  //保存盘块中的文件内容
 	short* p = (short*)Disk[0];
 	p[0] = ffbp;
 	p[1] = Udelp;
-	ofstream ffo("Disk.dat", ios::binary);
+	ofstream ffo("Disk256G.dat", ios::binary);
 	for (i = 0; i < K; i++)
 		ffo.write((char*)& Disk[i], SIZE);
 	ffo.close();
