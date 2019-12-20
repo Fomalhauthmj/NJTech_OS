@@ -1,4 +1,5 @@
-cd /usr
-dir
-type boy
-copy boy user/box
+replace t1 /
+replace test /usr
+create /usr/test hs
+replace test /usr
+replace test 

@@ -1,0 +1,424 @@
+4.1
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>dir
+
+The Directory of C:/
+
+bin                 <DIR>
+usr                 <DIR>
+auto                        84
+                 dev<DIR>
+                 boy       197
+             yongmei       189
+                good       283
+            protocol       411
+               map_A       162
+             map_abc       203
+                test        84
+
+     8 file(s)    1613 bytes
+     3 dir(s)   235776 free
+
+C:/>md test
+
+错误：目录与现有目录或文件重名！
+
+
+4.2
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>cd /usr/user
+
+C:/usr/user>cd..
+
+C:/usr>
+
+
+4.3
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>create t1
+
+文件/t1建立成功
+
+C:/>write t1
+
+请输入写入文件的内容(最多允许输入10240个字节)：
+0123456
+
+C:/>create t2
+
+文件/t2建立成功
+
+C:/>write t2
+
+请输入写入文件的内容(最多允许输入10240个字节)：
+0123478
+
+C:/>fc t1 t2
+文件/t1与文件/t2在第6字节处不同：5,7
+
+C:/>
+
+
+4.4
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>batch test.txt
+
+C:/>replace t1 /
+
+文件/t1不存在。
+
+C:/>replace test /usr
+
+文件/usr/test不存在。
+
+C:/>create /usr/test hs
+
+文件/usr/test建立成功
+
+C:/>replace test /usr
+
+文件/usr/test具有隐藏和系统属性的文件不能被取代。
+
+C:/>replace test
+
+文件/test是只读属性的文件。是否继续操作？（y/n）
+y
+
+文件/test不能自己取代自己。
+
+C:/>
+C:/>
+
+
+4.6
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>batch test s
+
+C:/>cd /
+
+C:/>dir
+
+The Directory of C:/
+
+bin                 <DIR>
+usr                 <DIR>
+auto                        84
+                 dev<DIR>
+                 boy       197
+             yongmei       189
+                good       283
+            protocol       411
+               map_A       162
+             map_abc       203
+                test        84
+
+     8 file(s)    1613 bytes
+     3 dir(s)   235776 free
+
+C:/>type boy
+Hello, boy!
+Welcome to Nanjing University of Technology.
+Welcome to School of Information Science and Engineering.
+欢迎来计算机系学习！
+The moon is in the sky.
+It is faraway.
+Let's go to the moon.
+
+
+C:/>cd usr/user
+
+C:/usr/user>dir
+
+The Directory of C:/usr/user
+
+..                  <DIR>
+li                  <DIR>
+sun                 <DIR>
+ma                  <DIR>
+qil_nanj                   207
+
+     1 file(s)     207 bytes
+     4 dir(s)   235776 free
+
+C:/usr/user>copy /boy
+
+C:/usr/user>type qil_nanj
+
+     七律　人民解放军占领南京　　1949.04
+
+　　　　钟山风雨起苍黄，百万雄师过大江。
+　　　　虎踞龙盘今胜昔，天翻地覆慨而慷。
+　　　　宜将胜勇追穷寇，不可沽名学霸王。
+　　　　天若有情天亦老，人间正道是沧桑。
+
+
+C:/usr/user>open boy
+
+文件/usr/user/boy打开成功。
+
+C:/usr/user>uof
+
+打开文件表UOF的内容如下:
+
+文件名                       文件属性  首块号  文件长度  状态  读指针  写指针
+/usr/user/boy                   普通    81      197      打开   1       198
+
+C:/usr/user>close boy
+
+关闭文件/usr/user/boy成功。
+
+C:/usr/user>cd/
+
+C:/>batch test.txt
+
+C:/>replace t1 /
+
+文件/t1不存在。
+
+C:/>replace test /usr
+
+文件/usr/test不存在。
+
+C:/>create /usr/test hs
+
+文件/usr/test建立成功
+
+C:/>replace test /usr
+
+文件/usr/test具有隐藏和系统属性的文件不能被取代。
+
+C:/>replace test
+
+文件/test是只读属性的文件。是否继续操作？（y/n）
+n
+
+C:/>
+C:/>
+
+4.7
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>create t1
+
+文件/t1建立成功
+
+C:/>create t2
+
+文件/t2建立成功
+
+C:/>type
+
+命令中无文件名。将使用当前操作文件。
+
+文件/t2是空文件
+
+C:/>write t1
+
+请输入写入文件的内容(最多允许输入10240个字节)：
+123
+
+C:/>close
+
+命令中缺少文件名。将使用当前操作文件。
+
+关闭文件/t2成功。
+
+C:/>
+
+
+4.8
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>attrib *
+
+/bin的属性是：普通
+
+/usr的属性是：普通
+
+/auto的属性是：R
+
+/dev的属性是：普通
+
+/recycled的属性是：RHS
+
+/boy的属性是：普通
+
+/yongmei的属性是：普通
+
+/good的属性是：普通
+
+/protocol的属性是：普通
+
+/map_A的属性是：普通
+
+/map_abc的属性是：普通
+
+/test的属性是：R
+
+C:/>cd /usr
+
+C:/usr>del *
+
+C:/usr>dir
+
+The Directory of C:/usr
+
+..                  <DIR>
+user                <DIR>
+lib                 <DIR>
+bin                 <DIR>
+
+     0 file(s)       0 bytes
+     4 dir(s)   236032 free
+
+C:/usr>cd/
+
+C:/>copy * /usr
+
+C:/>dir /usr
+
+The Directory of C:/usr
+
+..                  <DIR>
+user                <DIR>
+lib                 <DIR>
+bin                 <DIR>
+auto                        84
+                 boy       197
+             yongmei       189
+                good       283
+            protocol       411
+               map_A       162
+             map_abc       203
+                test        84
+
+     8 file(s)    1613 bytes
+     4 dir(s)   233472 free
+
+C:/>
+
+
+4.15
+
+
+
+
+现在你可以输入各种操作命令.
+Help —— 简易帮助信息.
+exit —— 退出本程序.
+
+C:/>udtab
+
+恢复被删除文件信息表(UdTab)内容如下：
+
+文件路径名                      文件名        文件大小      文件属性      首块号      存储块号
+
+C:/>del test
+
+文件/test是只读文件，你确定要删除它吗？(y/n) y
+
+C:/>
+C:/>md t1
+
+C:/>udtab
+
+恢复被删除文件信息表(UdTab)内容如下：
+
+文件路径名                      文件名        文件大小      文件属性      首块号      存储块号
+/                               |test         |84          |1           |75          |81
+
+C:/>undel
+
+文件test原目录项已经被占用，是否仍要恢复？（y/n）
+y
+
+文件test可能可以恢复，是否恢复它？(y/n) y
+
+共恢复了 1 个被删除的文件。
+
+C:/>
+C:/>dir
+
+The Directory of C:/
+
+bin                 <DIR>
+usr                 <DIR>
+auto                        84
+                 dev<DIR>
+                 boy       197
+             yongmei       189
+                good       283
+            protocol       411
+               map_A       162
+             map_abc       203
+                  t1<DIR>
+                test        84
+
+     8 file(s)    1613 bytes
+     4 dir(s)   235520 free
+
+C:/>del good
+
+C:/>del boy
+
+C:/>undel
+
+文件good可能可以恢复，是否恢复它？(y/n) y
+
+文件boy可能可以恢复，是否恢复它？(y/n) y
+
+共恢复了 2 个被删除的文件。
+
+C:/>
+C:/>
+
+
+
+
+
+
+
+
+
+
+
+
+
