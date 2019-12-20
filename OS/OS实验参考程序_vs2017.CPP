@@ -3665,6 +3665,9 @@ int MoveComd(int k)
 			{
 				// 执行覆盖
 				*tmp_fcbp = *src_fcbp;
+				FCB* q = (FCB*)Disk[tmp_fcbp->Addr];
+				if (tmp_fcbp->Fattrib & (1 << 4))
+					q->Addr = dst_s;
 				src_fcbp->FileName[0] = (char)0xe5;
 			}
 			return 0;
@@ -3675,6 +3678,9 @@ int MoveComd(int k)
 	{
 		FindBlankFCB(dst_s, tmp_fcbp);
 		*tmp_fcbp = *src_fcbp;
+		FCB* q = (FCB*)Disk[tmp_fcbp->Addr];
+		if (tmp_fcbp->Fattrib & (1 << 4))
+			q->Addr = dst_s;
 		src_fcbp->FileName[0] = (char)0xe5;
 		return 0;
 	}
