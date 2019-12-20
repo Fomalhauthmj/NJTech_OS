@@ -47,6 +47,7 @@
 // batch——批处理
 // move——文件“搬家”及子目录改名
 ////////////////////////////////////////////////////////////////////////////
+#pragma warning(disable:4996)
 
 #include <iostream>	//cout,cin
 #include <iomanip>	//setw(),setiosflags()
@@ -1679,7 +1680,7 @@ void CloseallComd(int disp)  //closeall命令，关闭当前用户的所有文�
 short int SAVE_bn(short bb) {
     // 在udtab中存储被删除文件的块号
 
-    short i = 0, b0, b, bs;
+    short i = 0, b0, b = 0, bs;
     if (bb == 0)  //被删除文件是空文件
         return bb;
     bs = getblock();
@@ -2037,7 +2038,7 @@ int ReadComd(int k)  //read命令的处理函数：读文件
     //		read <文件名> <位置m> <字节数n>>——从文件第m个字节开始，共读n个字节。
     // 说明：刚打开的文件，其读指针指向文件开头(即读指针等于1)，约定空文件的读指针等于0。
 
-    short i, j, ii, i_uof, pos, offset;
+    short i, j, ii, i_uof, pos = 0, offset;
     short b, b0, bnum, count = 0, readc;
     char attrib = '\0';
     char Buffer[SIZE + 1];
@@ -2154,7 +2155,7 @@ int ReadComd(int k)  //read命令的处理函数：读文件
 
 /////////////////////////////////////////////////////////////////
 
-int CopyComd(int k)  //copy命令的处理函数：复制文件
+int CopyComd(int k)		//copy命令的处理函数：复制文件 
 {
 	// 复制文件：copy <源文件名> [<目标文件名>]
 	// 命令功能：为目标文件建立目录项，分配新的盘块，并将源文件的内容复制到目标文件中
@@ -2182,60 +2183,42 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 	char attrib = '\0', * FileName1, * FileName2, * FileName3;
 	char gFileName1[PATH_LEN], gFileName2[PATH_LEN], gFileName3[PATH_LEN];	//存放文件全路径名
 	FCB* fcbp, * fcbp1, * fcbp2, * fcbp3;
-	if (k < 1 || k>2)
+	if (k < 1 || k > 2)
 	{
 		cout << "\n命令中参数太多或太少。\n";
 		return -1;
 	}
-	if (!strcmp(comd[1], "*"))
+	if (strcmp(comd[1], "*") == 0)
 	{
-		//统配符
-		char* cur_path = new char[PATH_LEN], * FileName;
+		int s = curpath.fblock;
+		char* cur_path = new char[PATH_LEN];
 		strcpy(cur_path, curpath.cpath);
-		int path_len = strlen(cur_path);
-		if (cur_path[path_len - 1] != '/')
-			strcat(cur_path, "/");
-		strcat(cur_path, "*");
-		//cout << cur_path << endl;
-		int s = ProcessPath(cur_path, FileName, k, 0, '\020');//取FileName所在目录的首块号
-		//cout << FileName << endl;
-		//cout << s << endl;
-		if (s == 1) strcpy(cur_path, "/");//根目录特殊处理
-		//cout << cur_path << endl;
-		short i, s0;
-		//cout << "start" << endl;
-		while (s > 0)			//在首块号为s的目录找非空登记栏，直到目录尾部
+		FCB* fcbp;
+		char* FilePath = new char[PATH_LEN];
+		char* tmpcomd = new char[PATH_LEN];
+		strcpy(tmpcomd, comd[2]);
+		int cnt = 0;
+		while (s > 0)
 		{
-			FCB* fcbp1 = (FCB*)Disk[s];
-			char* target_path = new char[PATH_LEN], * base_path = new char[PATH_LEN];
-			int temp_len = strlen(comd[2]);
-			if (comd[2][temp_len - 1] != '/')
-				strcat(comd[2], "/");
-			strcpy(target_path, comd[2]);
-			strcpy(base_path, comd[2]);
-			for (i = 0; i < 16; i++, fcbp1++)
-				if (fcbp1->FileName[0] != (char)0xe5 && fcbp1->FileName[0] != '\0' && (int)fcbp1->Fattrib < 16)
+			fcbp = (FCB*)Disk[s];
+			for (int i = 0; i < 4; i++, fcbp++)
+				if (fcbp->FileName[0] != (char)0xe5 && fcbp->FileName[0] != '\0' && (int)fcbp->Fattrib < 16)
 				{
-					char* FilePath = new char[PATH_LEN];
 					strcpy(FilePath, cur_path);
 					int len = strlen(FilePath);
 					if (FilePath[len - 1] != '/')
 						strcat(FilePath, "/");
-					strcat(FilePath, fcbp1->FileName);
+					strcat(FilePath, fcbp->FileName);
 					strcpy(comd[1], FilePath);
-					strcat(target_path, fcbp1->FileName);//处理目标路径
-					strcpy(comd[2], target_path);
-					//cout << comd[1] << endl;
-					//cout << comd[1] << "->" << comd[2] << endl;
 					CopyComd(k);//找到非空目录项
-					strcpy(target_path, base_path);
-					delete[] FilePath;
+					strcpy(comd[2], tmpcomd);
+					cnt++;
 				}
-			s0 = s;		//记下上一个盘块号
 			s = FAT[s];	//取下一个盘块号
-			delete[] target_path, base_path;
 		}
 		delete[] cur_path;
+		delete[] FilePath;
+		cout << "\n" << cnt << "file(s) copied。\n";
 		return 1;
 	}
 
@@ -2499,7 +2482,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 		cout << "\n命令中的目标文件名错误。\n";
 		return -2;
 	}
-	
+
 	s2 = FindFCB(FileName2, s02, '\040', fcbp);	//取FileName2(目标文件)的首块号(查其存在性)
 	if (fcbp->Fattrib & 16)
 	{
@@ -2513,16 +2496,15 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 	}
 	else if (fcbp->Fattrib <= '\07')	//存在同名目标文件
 	{
-		if (s01 == s02 && !strcmp(FileName1,FileName2)) // 同目录
+		if (s01 == s02 && !strcmp(FileName1, FileName2)) // 同目录
 		{
 			cout << "\n不能同目录同名复制。\n";
 			return -5;
 		}
-		cout << "\n存在文件与目标文件同名。\n";
-		cout << "是否覆盖？[y/n]\n";
-		char choice;
+		cout << "\n存在文件与目标文件同名，是否覆盖？[y/n] ";
+		string choice;
 		cin >> choice;
-		if (choice == 'n' || choice == 'N')
+		if (choice[0] == 'n' || choice[0] == 'N')
 			return -3;
 		else
 		{
@@ -2530,7 +2512,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 			strcpy(nextpath, FileName2);
 			strcpy(comd[1], gFileName2);
 			i = strlen(comd[1]);
-			if (comd[1][i - 1] != '/') 
+			if (comd[1][i - 1] != '/')
 				strcat(comd[1], "/");
 			strcat(comd[1], nextpath);
 			DelComd(1);		// 先删除目标文件
@@ -2541,7 +2523,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 	}
 	else			//FileName2存在，但它是目录名
 	{
-		if (s2 == s01)		
+		if (s2 == s01)
 		{
 			cout << "\n目标目录下已存在该文件。\n";
 			return -5;
@@ -2553,10 +2535,10 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 			{
 				if (fcbp->Fattrib <= '\07') // 目标目录中存在同名源文件
 				{
-					cout << "\n该目录下有同名文件，是否覆盖？[y/n]\n";
-					char choice;
+					cout << "\n该目录下有同名文件，是否覆盖？[y/n] ";
+					string choice;
 					cin >> choice;
-					if (choice == 'n' || choice == 'N')
+					if (choice[0] == 'n' || choice[0] == 'N')
 						return -4;
 					else
 					{
@@ -2569,18 +2551,15 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 						i = strlen(comd[1]);
 						if (comd[1][i - 1] != '/')
 							strcat(comd[1], "/");
-						strcat(comd[1], nextpath2);
-						strcat(comd[1], "/");
 						strcat(comd[1], nextpath1);
 						DelComd(1);		// 先删除目标文件
-
 						strcpy(FileName2, nextpath1);
 						delete[] nextpath1;
 						delete[] nextpath2;
 						s22 = s2;		// 取FileName2所在目录的首块号
 					}
 				}
-				else 
+				else
 				{
 					cout << "\n该目录下有同名目录。\n";
 					return -5;
@@ -2593,6 +2572,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 			}
 		}
 	}
+
 	i = FindBlankFCB(s22, fcbp2);
 	if (i < 0)
 	{
@@ -2620,6 +2600,7 @@ int CopyComd(int k)  //copy命令的处理函数：复制文件
 		s1 = FAT[s1];				//准备复制下一个盘块
 		b0 = b;
 	}
+
 	return 1;					//文件复制成功，返回
 }
 
